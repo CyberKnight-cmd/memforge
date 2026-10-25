@@ -7,8 +7,12 @@ set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 
-option(MEMSIM_WERROR "Treat warnings as errors" ON)
+option(MEMSIM_WERROR "Treat warnings as errors (CI turns this on)" OFF)
 option(MEMSIM_SANITIZE "Build with AddressSanitizer and UBSan" OFF)
+option(MEMSIM_VALGRIND "Run every test under Valgrind memcheck" OFF)
+if(MEMSIM_SANITIZE AND MEMSIM_VALGRIND)
+  message(FATAL_ERROR "MEMSIM_SANITIZE and MEMSIM_VALGRIND cannot be combined")
+endif()
 
 # Warnings and sanitizers for first-party code; third_party/ does not link this.
 add_library(memsim_flags INTERFACE)

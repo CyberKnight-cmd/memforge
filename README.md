@@ -18,21 +18,26 @@ benchmark row.
 
 ## Quick start
 
-Requirements: a C17 compiler (gcc or clang), CMake 3.25 or later, and Ninja.
+Requirements: Linux or macOS (Windows through WSL, since the simulator uses POSIX `fork` and
+`mmap`), a C17 compiler (gcc or clang), CMake 3.25 or later, Ninja, and
+[pre-commit](https://pre-commit.com/).
 
 ```sh
+pre-commit install            # once per clone: format and layer checks on every commit
 cmake --preset dev            # Debug build with AddressSanitizer and UBSan
 cmake --build --preset dev
 ctest --preset dev
 ./build/dev/bin/memsim
 ```
 
-Use the `release` preset for benchmarks. Before opening a pull request, also run the checks CI runs:
+| Preset | Use it for |
+| --- | --- |
+| `dev` | Day-to-day work: Debug with AddressSanitizer and UBSan |
+| `release` | Benchmarks: optimised, and the build that catches warnings only `-O2` shows |
+| `valgrind` | Running every test under Valgrind memcheck |
 
-```sh
-scripts/check_layers.sh
-find src tests -name '*.[ch]' -print0 | xargs -0 clang-format --dry-run --Werror
-```
+Warnings are errors in CI only. Locally, add `-DMEMSIM_WERROR=ON` to the configure step to see
+exactly what CI will reject.
 
 ## What it will do
 
@@ -99,5 +104,13 @@ Ten owners, one per area; [CODEOWNERS](.github/CODEOWNERS) routes reviews accord
   on).
 - Each pull request needs its module owner's approval. Changes to `src/common/`, a shared header, an
   event or a file format also need P1, and an RFC issue once kickoff has ratified the contracts.
-- Follow [the conventions](docs/CONVENTIONS.md); CI rejects formatting, layering, warning and test
-  failures.
+- Follow [the conventions](docs/CONVENTIONS.md).
+- Every pull request runs CI. Merging needs the single **CI passed** check, which waits for all of
+  these:
+  - the pre-commit hooks
+  - gcc and clang builds in `dev` and `release`, with warnings as errors
+  - the tests under ASan, UBSan and Valgrind
+  - clang-tidy
+
+  Run `pre-commit run --all-files` and `ctest --preset dev` first and most PRs pass on the first
+  try.

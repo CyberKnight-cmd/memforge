@@ -9,5 +9,5 @@ Checks: >
   -readability-identifier-length,
   -readability-magic-numbers,
   -misc-include-cleaner
-WarningsAsErrors: ''
+WarningsAsErrors: '*'
 HeaderFilterRegex: 'include/memsim/.*'

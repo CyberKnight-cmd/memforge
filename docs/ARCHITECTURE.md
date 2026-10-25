@@ -1122,24 +1122,27 @@ src/<module>/
 
 `DEPS` is the layering contract: a module that does not link another cannot even find its headers. CODEOWNERS (in `.github/`) gives each module's folder, including its `CMakeLists.txt`, to its owner; `scripts/check_layers.sh` keeps an allowed-dependency table, so widening `DEPS` also needs a reviewed change to that script.
 
-CI stages on every push and pull request, in order:
+Checks run in two places. `pre-commit` runs on every local commit: file hygiene, clang-format at a pinned version, and the layer check. CI runs the same hooks and then everything else on every push to `main` and every pull request:
 
-1. Format: `clang-format --dry-run --Werror` over `src/` and `tests/`.
-2. Layering: `scripts/check_layers.sh`.
-3. Build: the `dev` preset with gcc and with clang, warnings as errors, ASan and UBSan on.
-4. Static analysis: `clang-tidy` over `compile_commands.json`.
-5. Tests: `ctest` runs unit, golden, property (fast budget), differential (small) and integration, then gcovr applies the coverage gate on engines.
-6. Determinism: every golden workload run twice and the traces diffed.
-7. Benchmark smoke: a tiny spec in checked mode.
+1. Lint: `pre-commit run --all-files`, with the same hooks and pinned versions as local.
+2. Build and test: gcc and clang × `dev` (Debug, ASan and UBSan) and `release` (`-O2`), warnings as errors, then `ctest`.
+3. Valgrind: every test under memcheck, failing on errors and definite or indirect leaks.
+4. Static analysis: `clang-tidy` over `compile_commands.json`, warnings as errors.
+5. Determinism (once there are golden workloads): every golden workload run twice and the traces diffed.
+6. Coverage (once engines exist): gcovr applies the engine coverage gate.
+7. Benchmark smoke (once the runner exists): a tiny spec in checked mode.
 
-Nightly jobs run the deep property budget, large differential runs and the test suite under Valgrind; a release tag runs full validation and builds the changelog.
+A final `CI passed` job depends on all the others, and it is the only check that branch protection on `main` requires, so jobs can be added without changing repository settings. Merging into `main` needs a pull request, that check, and a code owner's approval. Dependabot keeps the pinned GitHub Actions current.
+
+Nightly jobs run the deep property budget, large differential runs and libFuzzer on the workload loader; a release tag runs full validation and builds the changelog.
 
 Conventions (Proposed, P10 to refine):
 
 - Trunk-based: short-lived branches named `feat/<module>-<topic>`, merged at least weekly; `main` is protected and always green.
 - Reviews: one owner approval; P1 also reviews any change to `src/common/`, an exported header that other modules use, an event or a file format, and the PR template asks for the RFC link.
 - Conventional Commits and SemVer (0.x until v1.0); workload and trace schemas carry their own version numbers.
-- Toolchain: C17, CMake 3.25 or later, Ninja, gcc and clang, clang-format, clang-tidy, gcovr, Valgrind; vendored libraries only, no system packages beyond the toolchain.
+- Toolchain: C17, CMake 3.25 or later, Ninja, gcc and clang, clang-format (pinned through pre-commit), clang-tidy, gcovr, Valgrind; vendored libraries only, no system packages beyond the toolchain.
+- Warnings are errors in CI (`-DMEMSIM_WERROR=ON`) but not by default, so a newer local compiler never blocks someone's build.
 
 ## 17. Architecture decision log
 

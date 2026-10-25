@@ -1,0 +1,7 @@
+build/
+benchmarks/results/
+compile_commands.json
+.cache/
+*.o
+*.a
+*.trace.jsonl

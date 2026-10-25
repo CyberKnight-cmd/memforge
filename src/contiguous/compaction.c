@@ -42,11 +42,14 @@ size_t ms_cont_compaction_plan_window(const ms_block *blocks, size_t count, int6
         }
     }
     bool found = false;
-    size_t best_first = 0, best_last = 0;
+    size_t best_first = 0;
+    size_t best_last = 0;
     int64_t best_units = 0;
     uint32_t best_blocks = 0;
     for (size_t first = 0; first < count; first++) {
-        int64_t free_units = 0, units = 0, cursor = blocks[first].start;
+        int64_t free_units = 0;
+        int64_t units = 0;
+        int64_t cursor = blocks[first].start;
         uint32_t moved = 0;
         for (size_t last = first; last < count; last++) {
             const ms_block *b = &blocks[last];
@@ -97,14 +100,16 @@ ms_cont_compaction_cost ms_cont_compaction_cost_of(const ms_block *blocks, size_
     return cost;
 }
 
-static size_t emit_free(ms_block *out, size_t n, int64_t start, int64_t end) {
-    if (end > start) {
-        out[n++] = (ms_block){.start = start,
-                              .size = end - start,
-                              .state = MS_BLOCK_FREE,
-                              .pid = MS_NONE,
-                              .alloc_id = MS_NONE,
-                              .requested = 0};
+static size_t emit_free(ms_block *out, size_t n, int64_t gap_from, int64_t gap_to) {
+    if (gap_to > gap_from) {
+        out[n++] = (ms_block){
+            .start = gap_from,
+            .size = gap_to - gap_from,
+            .state = MS_BLOCK_FREE,
+            .pid = MS_NONE,
+            .alloc_id = MS_NONE,
+            .requested = 0,
+        };
     }
     return n;
 }
@@ -112,7 +117,8 @@ static size_t emit_free(ms_block *out, size_t n, int64_t start, int64_t end) {
 size_t ms_cont_compaction_preview(const ms_block *blocks, size_t count, const ms_cont_move *moves,
                                   size_t move_count, ms_block *out) {
     size_t n = 0;
-    int64_t memory_size = 0, end = 0;
+    int64_t memory_size = 0;
+    int64_t end = 0;
     for (size_t i = 0; i < count; i++) {
         const ms_block *b = &blocks[i];
         if (b->start + b->size > memory_size) {

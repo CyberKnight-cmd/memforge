@@ -3,8 +3,9 @@
 
 /* floor(part * 1e6 / whole) for 0 <= part <= whole, whole > 0, without overflow. */
 static uint32_t ppm_of(int64_t part, int64_t whole) {
-    uint64_t p = (uint64_t)part, w = (uint64_t)whole;
-    return (uint32_t)((p / w) * MS_PPM + ((p % w) * MS_PPM) / w);
+    uint64_t p = (uint64_t)part;
+    uint64_t w = (uint64_t)whole;
+    return (uint32_t)(((p / w) * MS_PPM) + (((p % w) * MS_PPM) / w));
 }
 
 ms_cont_frag_report ms_cont_frag_report_of(const ms_block *blocks, size_t count) {
@@ -39,7 +40,8 @@ ms_cont_failure_cause ms_cont_frag_classify_failure(const ms_block *blocks, size
 }
 
 uint32_t ms_cont_frag_unusable_free_ppm(const ms_block *blocks, size_t count, int64_t s) {
-    int64_t total = 0, unusable = 0;
+    int64_t total = 0;
+    int64_t unusable = 0;
     for (size_t i = 0; i < count; i++) {
         if (blocks[i].state == MS_BLOCK_FREE) {
             total += blocks[i].size;

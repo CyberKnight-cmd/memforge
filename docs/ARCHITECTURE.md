@@ -1,6 +1,9 @@
-# MemForge — System Architecture v0.1 (draft for team review)
+# MemForge — System Architecture v0.2 (draft for team review)
 
 Oct 25, 2026 · @Arya Gupta
+
+v0.2 sets the implementation language to C (ADR-001). Code samples, data structures, tooling and
+the repository layout follow from that; the behaviour, formats and acceptance criteria are unchanged.
 
 ## 0. Status and how to review
 
@@ -17,7 +20,7 @@ How to review:
 1. Everyone reads sections 1 to 6: scope, acceptance criteria, architecture, ownership and the shared kernel.
 2. Owners read their module sections and answer their questions in section 19, proposing changes rather than only raising concerns.
 3. P8 (QA) challenges every invariant and expected number, because each one becomes a test.
-4. After kickoff, shared types and Protocols (section 6), events and traces (section 11) and the workload format (section 12) change only through an RFC plus a schema-version bump.
+4. After kickoff, shared types and interfaces (section 6), events and traces (section 11) and the workload format (section 12) change only through an RFC plus a schema-version bump.
 
 ## 1. Problem, goals and non-goals
 
@@ -74,7 +77,7 @@ v1 commits to 18 MUST requirements; the 8 SHOULD items are planned work and the 
 | FR-U3 | Viewer: step-through replay and side-by-side comparison | SHOULD | P9 |
 | FR-Q1 | Golden, property, differential, integration and determinism tests gate every merge | MUST | P8 |
 | FR-R1 | CI pipeline, contribution guide, API docs, release checklist | MUST | P10 |
-| FR-S1 | Real-arena backend: same placement policies over an `mmap`'d arena in C, differential-tested against the simulator | COULD | P2, P3 |
+| FR-S1 | Real-arena backend: same placement policies over an `mmap`'d arena, differential-tested against the simulator | COULD | P2, P3 |
 | FR-S2 | TLB with hit ratio and effective access time | COULD | P5 |
 | FR-S3 | Two-level page table | COULD | P5 |
 | FR-S4 | Buddy allocator | COULD | P3 |
@@ -82,12 +85,13 @@ v1 commits to 18 MUST requirements; the 8 SHOULD items are planned work and the 
 | ID | Non-functional requirement | Target or enforcement |
 | --- | --- | --- |
 | NFR-1 | Determinism: same workload, config and seed give a byte-identical trace | CI job runs every golden workload twice and diffs |
-| NFR-2 | Engine purity: no I/O, wall clock or global state in the core; clients use only `Session` and events | import-linter layer contract in CI |
+| NFR-2 | Engine purity: no I/O, wall clock or global state in the core; clients use only `Session` and events | Per-module link visibility plus `scripts/check_layers.sh` in CI |
 | NFR-3 | Checked mode: every invariant verified after every step | On in all tests and CI benchmark smoke runs |
 | NFR-4 | Extensibility: a new policy is one class, one registry line, one golden test | Zero engine edits |
 | NFR-5 | Performance: 100k-op workload at trace level 0 | Under 30 s on a team laptop; re-tune after first measurement |
 | NFR-6 | Reproducibility: every report figure regenerates from a bench spec plus a git SHA | Both stored in every result row |
-| NFR-7 | Code quality: ruff clean, mypy strict on `src/`, engine line coverage | At least 90% (Proposed) |
+| NFR-7 | Code quality: no warnings under `-Wall -Wextra -Wpedantic -Werror` with gcc and clang, clang-tidy clean, engine line coverage (gcovr) | At least 90% (Proposed) |
+| NFR-8 | Memory safety: no leaks, overflows or undefined behaviour | ASan and UBSan on every CI test run, Valgrind nightly, zero reports |
 
 ## 3. Acceptance criteria
 
@@ -186,7 +190,7 @@ Design principles (Proposed):
 - Pure core, clients at the edges: the CLI, viewer and benchmark runner all use one `Session` API; none has a private path into an engine.
 - Commands in, events out: every operation yields an ordered list of events, and that event log is the contract between modules.
 - Policies decide, engines mutate: placement and replacement policies return decisions; only engines change state, so every piece of state has one owner.
-- Pluggable strategies: a new policy is one class plus one registry line.
+- Pluggable strategies: a new policy is one source file plus one registry line.
 - File contracts at the edges: workloads, traces and results are versioned JSONL, so P8 and P9 build against sample files on day one.
 - Determinism by construction: integer state, logical clocks, fixed tie-breaks, seeded randomness only inside generators.
 - Bugs fail loudly, domain failures are recorded (the error model in section 6).
@@ -202,23 +206,23 @@ One run, end to end:
 
 ## 5. Module map and ownership
 
-Each package has exactly one owner; owners review every change to their package, and P1 also reviews anything that crosses a module boundary.
+Each module has exactly one owner; owners review every change to their module, and P1 also reviews anything that crosses a module boundary.
 
-| Package | Owner | Provides | Consumes |
+| Module | Owner | Provides | Consumes |
 | --- | --- | --- | --- |
-| `memsim.common` | P1 | Types, config, errors, event schema, `EventBus`, policy registry | Nothing |
-| `memsim.session`, `memsim.trace` | P1 | `Session`, `RunResult`, `TraceWriter`, snapshots | Engines, loader, sinks |
-| `memsim.contiguous` (model, view, invariants, engine) | P2 | `MemoryModel`, `MemoryView`, `ContiguousEngine`, invariants I1 to I8 | `common`, placement, fragmentation, compaction |
-| `memsim.contiguous.policies` | P3 | First-, Best-, Worst-, Next-Fit | `MemoryView` only |
-| `memsim.contiguous.fragmentation`, `.compaction` | P4 | `FragmentationAnalyzer`, `CompactionStrategy` | `MemoryView`, `apply_relocations` |
-| `memsim.paging` (mmu, tables, frames, engine, invariants) | P5 | `PagingEngine`, `FrameView`, invariants V1 to V6 | `common`, replacement |
-| `memsim.paging.policies`, `.belady` | P6 | FIFO, LRU, OPT, Clock, frame sweep | `FrameView`, `Session` |
-| `memsim.workloads`, `.metrics`, `.bench` | P7 | Loader, generators, `MetricsCollector`, runner, exports | `Session`, events |
-| `tests/golden`, `property`, `oracle`, `integration` | P8 | Independent verification | Public API only |
-| `memsim.cli`, `viewer/` | P9 | CLI, viewer | `Session`, trace and result files |
-| Repo root, `.github/`, `docs/` | P10 | CI, templates, docs site, release checklist | Everything |
+| `src/common` | P1 | Types, config, errors, event schema, `EventBus`, registry lookup, seeded RNG | Nothing |
+| `src/session`, `src/trace` | P1 | `Session`, `RunResult`, `TraceWriter`, snapshots | Engines, loader, sinks |
+| `src/contiguous` (model, view, invariants, engine) | P2 | `MemoryModel`, `MemoryView`, `ContiguousEngine`, invariants I1 to I8 | `common`, placement, fragmentation, compaction |
+| `src/contiguous/policies`, `placement.h` | P3 | First-, Best-, Worst-, Next-Fit | `MemoryView` only |
+| `src/contiguous/fragmentation`, `compaction` | P4 | `FragmentationAnalyzer`, `CompactionStrategy` | `MemoryView`, `apply_relocations` |
+| `src/paging` (mmu, tables, frames, engine, invariants) | P5 | `PagingEngine`, `FrameView`, invariants V1 to V6 | `common`, replacement |
+| `src/paging/policies`, `replacement.h`, `belady` | P6 | FIFO, LRU, OPT, Clock, frame sweep | `FrameView`, `PagingEngine` |
+| `src/workloads`, `src/metrics`, `src/bench` | P7 | Loader, generators, `MetricsCollector`, runner, exports | `Session`, events |
+| `tests/golden`, `property`, `oracle`, `integration` | P8 | Independent verification | Exported headers only |
+| `src/cli`, `viewer/` | P9 | CLI, viewer | `Session`, trace and result files |
+| Repo root, `.github/`, `docs/`, `scripts/`, `cmake/`, `third_party/` | P10 | Build, CI, templates, docs, release checklist | Everything |
 
-An arrow A → B means B builds on A's contract; B starts early against A's Protocol and a fake. Thick borders mark the critical path.
+An arrow A → B means B builds on A's contract; B starts early against A's interface and a fake. Thick borders mark the critical path.
 
 ```mermaid
 flowchart LR
@@ -260,10 +264,10 @@ Boundary clarifications to the team split (Proposed):
 - Testing: owners unit-test their own code; P8 writes independent golden, property, differential and end-to-end tests from this spec; P10 runs all of it in CI.
 - Engines: P2 owns the contiguous step loop and wires P4's compaction trigger into it; P5 owns the paging step loop.
 - Formats: P1 owns the event and trace schema; P7 owns the workload and result-row schemas; changes to either need P1's sign-off.
-- Belady: P6 owns the sweep and anomaly detector; P7 calls it from the benchmark runner.
+- Belady: P6 owns the sweep and anomaly detector, which drive `PagingEngine` directly because `paging` may not depend on `Session`; P7 calls it from the benchmark runner.
 - Interface: P9 consumes `Session`, trace files and result files only; the viewer renders snapshots and never re-implements allocation or replacement.
 
-Import rules, enforced by import-linter in CI: `common` imports nothing from MemSim; `contiguous` and `paging` import only `common` and never each other; policies never import engines; nothing in `src/` imports `cli`, `bench` or `viewer`.
+Layering rules, enforced by link visibility (a module sees only the exported headers of the modules it links) and by `scripts/check_layers.sh` in CI: `common` includes nothing from MemSim; `contiguous` and `paging` include only `common` and never each other; policies never include engines; only the CLI uses `bench`; and the core (`common`, `contiguous`, `paging`) includes no I/O or clock headers.
 
 ## 6. Shared kernel
 
@@ -271,102 +275,113 @@ The kernel fixes the vocabulary every module shares: units, ranges, identifiers,
 
 | Concept | Decision |
 | --- | --- |
-| Memory unit | Integer abstract unit (the UI may label it KB); no floats in engine state |
+| Memory unit | Integer abstract unit stored as `int64_t` (the UI may label it KB); no floats in engine state |
 | Ranges | Half-open \[start, end) with end = start + size, everywhere |
-| Process id | String such as `P1`; `SYS` is reserved for fixtures |
-| Allocation id | String chosen by the workload, unique across the whole workload, never reused (ADR-003) |
+| Process id | String such as `P1` in files, interned to an `ms_pid` integer at load (ADR-013); `SYS` is reserved for fixtures |
+| Allocation id | String chosen by the workload, unique across the whole workload, never reused (ADR-003); interned to a dense `ms_alloc_id` at load |
 | Frames and pages | Integers: frame 0 to F − 1, vpn 0 to pages − 1 |
 | Clocks | `step` = index of the op; `t` = index of the reference among accesses (paging); `seq` = global event index; no wall clock in engines |
 | Tie-breaks | Placement: lowest address. Free frames: lowest index. Replacement: per policy, section 10 |
-| Randomness | Only in generators and the Random policy, through an injected seeded RNG |
+| Randomness | Only in generators and the Random policy, through an injected `ms_rng` (xoshiro256\*\*); never libc `rand()`, whose sequence differs between platforms |
 
-Core types, written in Python because ADR-001 proposes it; the shapes carry over to any language:
+Core types, in C (ADR-001). The loader interns every string id (`"P1"`, `"a4"`) into a dense integer, so the engine never hashes or compares strings and every per-id index is a plain array; strings come back only in the trace writer, through the run's symbol table (ADR-013).
 
-```python
-# memsim/common/types.py
-Pid = NewType("Pid", str)          # "P1", "SYS"
-AllocId = NewType("AllocId", str)  # workload-assigned, never reused
-PageKey = tuple[Pid, int]          # (pid, vpn)
+```c
+/* src/common/include/memsim/common/types.h */
+typedef uint32_t ms_pid;            /* interned "P1", "SYS" */
+typedef uint32_t ms_alloc_id;       /* interned, workload-assigned, never reused */
+#define MS_NONE UINT32_MAX          /* no pid / no id */
 
-@dataclass(frozen=True, slots=True)
-class Hole:
-    start: int
-    size: int
-    @property
-    def end(self) -> int:          # half-open [start, end)
-        return self.start + self.size
+typedef struct { ms_pid pid; uint32_t vpn; } ms_page_key;
 
-class BlockState(Enum):
-    FREE = "free"
-    ALLOCATED = "allocated"
+typedef struct { int64_t start, size; } ms_hole;    /* half-open [start, start + size) */
+static inline int64_t ms_hole_end(ms_hole h) { return h.start + h.size; }
 
-@dataclass(slots=True)
-class Block:
-    start: int                     # changes only through compaction
-    size: int                      # granted size, >= requested
-    state: BlockState
-    pid: Pid | None = None         # None iff FREE
-    alloc_id: AllocId | None = None
-    requested: int | None = None   # internal fragmentation = size - requested
+typedef enum { MS_BLOCK_FREE, MS_BLOCK_ALLOCATED } ms_block_state;
 
-@dataclass(frozen=True, slots=True)
-class Event:
-    seq: int                       # global, gapless, from 0
-    step: int                      # the op that caused it
-    type: str                      # catalogue in section 11
-    data: Mapping[str, object]
+typedef struct {
+    int64_t start;                  /* changes only through compaction */
+    int64_t size;                   /* granted size, >= requested */
+    ms_block_state state;
+    ms_pid pid;                     /* MS_NONE iff FREE */
+    ms_alloc_id alloc_id;           /* MS_NONE iff FREE */
+    int64_t requested;              /* internal fragmentation = size - requested */
+} ms_block;
 
-# Commands: exactly one of vpn / va is set on Access (the loader checks)
-@dataclass(frozen=True)
-class Alloc: pid: Pid; id: AllocId; size: int
-@dataclass(frozen=True)
-class Free: pid: Pid; id: AllocId
-@dataclass(frozen=True)
-class Terminate: pid: Pid
-@dataclass(frozen=True)
-class Compact: pass
-@dataclass(frozen=True)
-class Spawn: pid: Pid; pages: int
-@dataclass(frozen=True)
-class Access: pid: Pid; vpn: int | None; va: int | None; write: bool
-Op = Alloc | Free | Terminate | Compact | Spawn | Access
+typedef struct {
+    uint64_t seq;                   /* global, gapless, from 0 */
+    uint64_t step;                  /* the op that caused it */
+    ms_event_type type;             /* catalogue in section 11 */
+    union {                         /* one member per event type */
+        struct { ms_pid pid; ms_alloc_id id; int64_t start, size, requested; } block_allocated;
+        struct { ms_pid pid; uint32_t vpn, frame; bool write; } page_hit;
+        /* ... */
+    } data;
+} ms_event;
+
+/* Commands: a tagged union; on ACCESS exactly one of vpn / va is set (the loader checks) */
+typedef enum { MS_OP_ALLOC, MS_OP_FREE, MS_OP_TERMINATE, MS_OP_COMPACT,
+               MS_OP_SPAWN, MS_OP_ACCESS } ms_op_kind;
+
+typedef struct {
+    ms_op_kind kind;
+    union {
+        struct { ms_pid pid; ms_alloc_id id; int64_t size; } alloc;
+        struct { ms_pid pid; ms_alloc_id id; } free;
+        struct { ms_pid pid; } terminate;
+        struct { ms_pid pid; uint32_t pages; } spawn;
+        struct { ms_pid pid; bool by_va; uint64_t vpn_or_va; bool write; } access;
+    } u;
+} ms_op;
 ```
 
-Configuration and the application facade:
+Configuration and the application facade. Every object with state is opaque and comes in a `_create` / `_destroy` pair, and every interface is a `const` table of function pointers plus a `void *` context:
 
-```python
-@dataclass(frozen=True)
-class ContiguousConfig:
-    memory_size: int
-    alignment: int = 1             # granted = round_up(requested, alignment)
-    min_split: int = 1             # a remainder below this is given away (internal fragmentation)
-    policy: str = "first-fit"
-    compaction: Literal["never", "on_failure", "threshold"] = "never"
-    compaction_threshold: float = 0.5   # external fragmentation that triggers it (threshold mode)
+```c
+typedef enum { MS_COMPACT_NEVER, MS_COMPACT_ON_FAILURE, MS_COMPACT_THRESHOLD } ms_compaction_trigger;
 
-@dataclass(frozen=True)
-class PagingConfig:
-    page_size: int                 # power of 2
-    frames: int
-    policy: str = "fifo"
-    scope: Literal["global", "local"] = "global"
-    t_mem_ns: int = 200            # effective-access-time inputs
-    t_fault_ns: int = 8_000_000
-    t_writeback_ns: int = 8_000_000
+typedef struct {
+    int64_t memory_size;
+    int64_t alignment;                  /* 1; granted = round_up(requested, alignment) */
+    int64_t min_split;                  /* 1; a remainder below this is given away (internal fragmentation) */
+    const char *policy;                 /* "first-fit" */
+    ms_compaction_trigger compaction;   /* MS_COMPACT_NEVER */
+    uint32_t compaction_threshold_ppm;  /* 500000 = 0.5 ext_frag, threshold mode; integer, so no float state */
+} ms_contiguous_config;
 
-class Session:
-    @classmethod
-    def create(cls, config: RunConfig, sinks: Sequence[EventSink] = ()) -> "Session": ...
-    def apply(self, op: Op) -> StepResult: ...          # one step (live UI)
-    def run(self, ops: Iterable[Op]) -> RunResult: ...  # whole workload
-    def snapshot(self) -> Snapshot: ...                 # read-only copy of state
+typedef enum { MS_SCOPE_GLOBAL, MS_SCOPE_LOCAL } ms_replacement_scope;
 
-class EventSink(Protocol):
-    def on_events(self, events: Sequence[Event]) -> None: ...  # once per step, seq order
-    def close(self, summary: RunSummary) -> None: ...
+typedef struct {
+    uint32_t page_size;                 /* power of 2 */
+    uint32_t frames;
+    const char *policy;                 /* "fifo" */
+    ms_replacement_scope scope;         /* MS_SCOPE_GLOBAL */
+    uint64_t t_mem_ns;                  /* 200; effective-access-time inputs */
+    uint64_t t_fault_ns;                /* 8000000 */
+    uint64_t t_writeback_ns;            /* 8000000 */
+} ms_paging_config;
 
-PLACEMENT.register("best-fit", BestFit)    # registries map CLI names to classes
-REPLACEMENT.register("lru", LRU)
+/* Defaults come from ms_contiguous_config_default() and ms_paging_config_default(). */
+
+typedef struct {
+    void *ctx;
+    void (*on_events)(void *ctx, const ms_event *events, size_t n);  /* once per step, seq order */
+    void (*close)(void *ctx, const ms_run_summary *summary);
+} ms_event_sink;
+
+typedef struct ms_session ms_session;   /* opaque */
+
+ms_status ms_session_create(const ms_run_config *config, const ms_event_sink *sinks,
+                            size_t n_sinks, ms_session **out);
+ms_status ms_session_apply(ms_session *s, const ms_op *op, ms_step_result *out);        /* one step (live UI) */
+ms_status ms_session_run(ms_session *s, const ms_op *ops, size_t n, ms_run_result *out); /* whole workload */
+ms_status ms_session_snapshot(const ms_session *s, ms_snapshot *out);                   /* read-only copy */
+void ms_session_destroy(ms_session *s);
+
+/* src/contiguous/policies/registry.c: registries map CLI names to vtables, one line per policy */
+static const ms_cont_placement_policy *const placement_registry[] = {
+    &ms_cont_first_fit, &ms_cont_best_fit, &ms_cont_worst_fit,
+};
 ```
 
 The error model has three tiers, so a bug can never pass as a fragmentation result:
@@ -375,11 +390,13 @@ The error model has three tiers, so a bug can never pass as a fragmentation resu
 | --- | --- | --- |
 | Input error | Malformed JSON, unknown op, alloc id reused in a file, page size not a power of 2 | Loader rejects before the run; exit code 2 with file and line |
 | Domain outcome | Allocation fails, double free, wrong owner, access out of range | Recorded as an event, state unchanged, run continues, counted in metrics |
-| Contract violation | Policy returns a hole that is not free or too small; an invariant breaks | Exception, run aborts, exit code 3, test fails |
+| Contract violation | Policy returns a hole that is not free or too small; an invariant breaks | `MS_ASSERT` calls the contract handler: the run aborts, the CLI exits with code 3, a test fails |
+
+`MS_ASSERT` stays on in release builds. It calls a handler that the client installs: the CLI's prints the message and exits with code 3, the test harness's records a failure, and the default calls `abort()`. The core itself never prints.
 
 ## 7. Contiguous allocation subsystem
 
-Memory is an address-ordered list of blocks that exactly tiles \[0, M). Hash indexes make frees O(1), a size-ordered index makes Best-Fit and Worst-Fit O(log h), and eight invariants define what a valid layout is.
+Memory is an address-ordered list of blocks that exactly tiles \[0, M). Per-id arrays make frees O(1), a size-ordered index makes Best-Fit and Worst-Fit O(log h), and eight invariants define what a valid layout is.
 
 ```mermaid
 classDiagram
@@ -444,14 +461,14 @@ classDiagram
 | Structure | Purpose | Proposed implementation | Cost |
 | --- | --- | --- | --- |
 | `blocks` | Canonical layout in address order, tiles \[0, M) | Doubly linked list of `Block` nodes | Split, coalesce O(1) given a node; scan O(n) |
-| `by_id` | Find the block to free | Hash map `AllocId` → node | O(1) |
-| `by_pid` | Free everything on `terminate` | Hash map `Pid` → set of `AllocId` | O(k) |
-| `free_by_size` | Best-Fit and Worst-Fit lookup | Sorted list of (size, start) via `sortedcontainers` | O(log h) |
-| `freed_ids` | Tell DOUBLE\_FREE apart from UNKNOWN\_ID | Set of `AllocId` | O(1) |
-| `failed_ids` | Skip frees of allocations that failed under this policy | Set of `AllocId` | O(1) |
+| `by_id` | Find the block to free | Array indexed by `ms_alloc_id` → node | O(1) |
+| `by_pid` | Free everything on `terminate` | Array indexed by `ms_pid` → intrusive list of live blocks | O(k) |
+| `free_by_size` | Best-Fit and Worst-Fit lookup | Balanced tree keyed by (size, start) | O(log h) |
+| `freed_ids` | Tell DOUBLE\_FREE apart from UNKNOWN\_ID | State byte per `ms_alloc_id`: UNSEEN, LIVE, FREED or FAILED | O(1) |
+| `failed_ids` | Skip frees of allocations that failed under this policy | Same state byte | O(1) |
 | `rover` (P3) | Next-Fit resume point | Integer address | O(1) |
 
-Here n = blocks, h = holes and k = live blocks of one process. A plain sorted Python list is acceptable for v1 if P2 prefers it: other modules only ever see the `MemoryView` Protocol (ADR-002).
+Here n = blocks, h = holes and k = live blocks of one process. A sorted array of (size, start) is acceptable for v1 if P2 prefers it (O(h) insert): other modules only ever see the `MemoryView` interface (ADR-002). One state byte per id makes the live, freed and failed sets disjoint by construction, so I7 holds structurally.
 
 | ID | Invariant, checked after every step in checked mode |
 | --- | --- |
@@ -496,17 +513,21 @@ With full sliding compaction the retry always succeeds when total free ≥ grant
 
 Policies are pure selectors over a read-only view: given the holes and a size they return one hole or none, and the engine validates and applies the choice. Compaction follows the same split: a strategy plans moves, the model applies them, and every move is an event.
 
-```python
-@dataclass(frozen=True)
-class Decision:
-    hole: Hole | None   # None = nothing fits
-    scanned: int        # holes examined: the search-cost metric
+```c
+typedef struct {
+    bool found;             /* false = nothing fits */
+    ms_hole hole;
+    uint32_t scanned;       /* holes examined: the search-cost metric */
+} ms_cont_decision;
 
-class PlacementPolicy(Protocol):
-    name: str
-    def choose(self, view: MemoryView, size: int) -> Decision: ...
-    def on_event(self, event: Event) -> None: ...   # no-op except Next-Fit
-    def reset(self) -> None: ...
+typedef struct {
+    const char *name;
+    void *(*create)(void);                  /* policy state; NULL for stateless policies */
+    void (*destroy)(void *state);
+    ms_cont_decision (*choose)(void *state, const ms_cont_view *view, int64_t size);
+    void (*on_event)(void *state, const ms_event *event);   /* NULL except Next-Fit */
+    void (*reset)(void *state);
+} ms_cont_placement_policy;
 ```
 
 | Policy | Picks | Tie-break | v1 cost | Indexed cost |
@@ -530,16 +551,18 @@ Placement rules: the block always goes at the hole's low end; policies never mut
 
 Worked example: AC-1 First-Fit fails the 426 request with 959 units free but a largest hole of 300, so ext\_frag = 1 − 300/959 = 0.687 and the cause is FRAGMENTATION.
 
-```python
-@dataclass(frozen=True)
-class Move:
-    alloc_id: AllocId
-    src: int   # old start
-    dst: int   # new start
+```c
+typedef struct {
+    ms_alloc_id alloc_id;
+    int64_t src;            /* old start */
+    int64_t dst;            /* new start */
+} ms_cont_move;
 
-class CompactionStrategy(Protocol):
-    name: str
-    def plan(self, view: MemoryView) -> list[Move]: ...   # pure: never mutates
+typedef struct {
+    const char *name;
+    /* Pure: never mutates. Writes at most view->allocated_count moves into out, returns the count. */
+    size_t (*plan)(const ms_cont_view *view, ms_cont_move *out);
+} ms_cont_compaction_strategy;
 ```
 
 Compaction design (P4, Proposed):
@@ -650,11 +673,11 @@ classDiagram
 
 | Structure | Purpose | Proposed implementation | Cost |
 | --- | --- | --- | --- |
-| Page table, one per process | vpn → PTE | `dict` (sparse) or a list of length `pages` | O(1) |
-| PTE | frame, present, referenced (R), dirty (D) | Slotted dataclass | O(1) |
-| Frame table | frame → (pid, vpn), needed to evict | List of length F, `None` when free | O(1) |
-| Free frame pool | Hand out the lowest free frame first (deterministic) | Min-heap (`heapq`) | O(log F) |
-| Seen pages | Classify a fault as COMPULSORY or CAPACITY | Set of `PageKey` | O(1) |
+| Page table, one per process | vpn → PTE | Array of `pages` PTEs, allocated at spawn | O(1) |
+| PTE | frame, present, referenced (R), dirty (D) | Struct: `uint32_t` frame plus three flag bits | O(1) |
+| Frame table | frame → (pid, vpn), needed to evict | Array of F `ms_page_key`, pid `MS_NONE` when free | O(1) |
+| Free frame pool | Hand out the lowest free frame first (deterministic) | Binary min-heap of frame indexes | O(log F) |
+| Seen pages | Classify a fault as COMPULSORY or CAPACITY | One bit per vpn, kept beside each page table | O(1) |
 
 R and D bits live in the PTE, where hardware would set them. Policies read them through `FrameView` and may only clear R, through `clear_referenced`, which emits an event; queues, timestamps and counters live inside the policy.
 
@@ -744,25 +767,31 @@ A fault caused by a write loads the page clean, and the same access then makes i
 
 Replacement policies own only their bookkeeping and answer one question: which frame to evict. OPT alone needs the future, so it declares `requires_lookahead` and `Session` refuses it in live sessions.
 
-```python
-class ReplacementPolicy(Protocol):
-    name: str
-    requires_lookahead: bool          # True only for OPT
-    def prepare(self, refs: Sequence[PageKey]) -> None: ...   # whole reference list, before the run
-    def on_load(self, frame: int, key: PageKey, t: int) -> None: ...
-    def on_access(self, frame: int, key: PageKey, t: int, write: bool) -> None: ...
-    def choose_victim(self, view: FrameView, candidates: Sequence[int], t: int) -> int: ...  # must be in candidates
-    def on_evict(self, frame: int, key: PageKey) -> None: ...
-    def describe_state(self) -> dict[str, object]: ...        # FIFO queue, LRU order, OPT distances
-    def reset(self) -> None: ...
+```c
+typedef struct {
+    const char *name;
+    bool requires_lookahead;            /* true only for OPT */
+    void *(*create)(uint32_t frames);
+    void (*destroy)(void *state);
+    void (*prepare)(void *state, const ms_page_key *refs, size_t n);   /* whole reference list, before the run */
+    void (*on_load)(void *state, uint32_t frame, ms_page_key key, uint64_t t);
+    void (*on_access)(void *state, uint32_t frame, ms_page_key key, uint64_t t, bool write);
+    uint32_t (*choose_victim)(void *state, const ms_page_frame_view *view,
+                              const uint32_t *candidates, size_t n, uint64_t t);  /* must be in candidates */
+    void (*on_evict)(void *state, uint32_t frame, ms_page_key key);
+    void (*describe_state)(const void *state, const ms_kv_writer *out);  /* FIFO queue, LRU order, OPT distances */
+    void (*reset)(void *state);
+} ms_page_replacement_policy;
 ```
+
+`ms_kv_writer` is a small callback table in `common` that the trace writer implements, so a policy can describe its state at level 2 without doing I/O.
 
 Here `t` is the reference index (it counts accesses only), not `step`.
 
 | Policy | Evicts | State | Cost | Tie-break |
 | --- | --- | --- | --- | --- |
-| FIFO | Earliest-loaded resident page | `deque` of frames in load order | O(1) per reference | None needed |
-| LRU | Least recently used page | `OrderedDict` in recency order, `move_to_end` on access | O(1) per reference | None needed |
+| FIFO | Earliest-loaded resident page | Ring buffer of frames in load order | O(1) per reference | None needed |
+| LRU | Least recently used page | Intrusive doubly linked list over frames, moved to the tail on access | O(1) per reference | None needed |
 | OPT | Page whose next use is farthest; never used again counts as infinity | `next_use` array from one backward pass, plus next use per frame | O(n) prep; O(F) scan or O(log F) heap per fault | Among never-used pages: lowest frame index |
 | Clock (COULD) | First frame with R = 0, sweeping from the hand and clearing R as it passes | Hand index; R bits through `FrameView` | Amortised O(1) | Hand order |
 | LFU (COULD) | Smallest use count | Count per frame | O(F) per fault | LRU among equal counts |
@@ -830,7 +859,7 @@ A level-2 snapshot line (block list cut short here):
 
 Format rules (Proposed):
 
-- Serialisation is canonical, which is what makes NFR-1 testable: fixed key order, floats rounded to 6 decimals, no timestamps or wall-clock fields.
+- Serialisation is canonical, which is what makes NFR-1 testable: fixed key order, ratios computed from integers and printed with `%.6f`, no timestamps or wall-clock fields.
 - Event names are past-tense PascalCase facts; data fields are snake\_case.
 - `schema` is an integer bumped on any breaking change; consumers reject a schema they do not know.
 - Paging snapshots carry `frames` (frame, pid, vpn, R, D), `page_tables` per process and the policy's `describe_state()` output.
@@ -886,7 +915,7 @@ The validator runs in strict mode by default and rejects, with file and line, a 
 | `refs-zipf` | Zipf-distributed page popularity | n, P, s |
 | `refs-belady` | Known anomaly strings plus a seeded random search | n, P, budget |
 
-Provenance rules: generator output is written to disk and that file is the artifact, so benchmarks never regenerate on the fly. Headers record generator name, version, seed and parameters, and every result row records the file's sha256. Generators draw from their own `random.Random(seed)`; the engine never draws random numbers except through a seeded Random policy.
+Provenance rules: generator output is written to disk and that file is the artifact, so benchmarks never regenerate on the fly. Headers record generator name, version, seed and parameters, and every result row records the file's sha256. Generators draw from their own `ms_rng` seeded from the header's seed; the engine never draws random numbers except through a seeded Random policy.
 
 ## 13. Metrics and benchmarking
 
@@ -911,31 +940,34 @@ One `MetricsCollector` (P7) computes every reported number from events, and one 
 \text{EAT} = (1 - p)\, t_{\text{mem}} + p\, t_{\text{fault}} + \frac{\text{write\_backs}}{\text{references}}\, t_{\text{wb}}, \qquad p = \text{fault\_rate}
 ```
 
-A benchmark spec is a committed YAML file; the runner expands it into runs:
+A benchmark spec is a committed JSON file, read with the same parser as workloads (ADR-012); the runner expands it into runs:
 
-```yaml
-name: e1-placement
-subsystem: contiguous
-workloads:
-  - generator: alloc-steady
-    params: {ops: 20000, size_dist: lognormal, mean: 64, sigma: 1.0, target_util: 0.85}
-    seeds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-  - file: tests/golden/fixtures/silberschatz_5_holes.jsonl
-policies: [first-fit, best-fit, worst-fit]
-grid:
-  memory_size: [4096, 16384]
-  compaction: [never, on_failure]
-trace_level: 0
-check_invariants: true
+```json
+{
+  "name": "e1-placement",
+  "subsystem": "contiguous",
+  "workloads": [
+    {
+      "generator": "alloc-steady",
+      "params": {"ops": 20000, "size_dist": "lognormal", "mean": 64, "sigma": 1.0, "target_util": 0.85},
+      "seeds": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    },
+    {"file": "tests/golden/fixtures/silberschatz_5_holes.jsonl"}
+  ],
+  "policies": ["first-fit", "best-fit", "worst-fit"],
+  "grid": {"memory_size": [4096, 16384], "compaction": ["never", "on_failure"]},
+  "trace_level": 0,
+  "check_invariants": true
+}
 ```
 
 ```mermaid
 flowchart LR
-  SPEC["Bench spec .yaml"] --> EXP["Expand: workloads x policies x grid x seeds"]
+  SPEC["Bench spec .json"] --> EXP["Expand: workloads x policies x grid x seeds"]
   GEN["Seeded generators"] --> WL["Workload files + sha256"]
   WL --> EXP
   EXP --> RUNS["RunSpec list"]
-  RUNS --> POOL["Process pool, one run per worker"]
+  RUNS --> POOL["Worker processes via fork, one run each"]
   POOL --> SES["Session.run, same API as the CLI"]
   SES --> MC["MetricsCollector"]
   MC --> ROWS["results.jsonl, one row per run"]
@@ -944,6 +976,8 @@ flowchart LR
   AGG --> PLOT["Plots"]
   AGG --> RPT["Report inputs"]
 ```
+
+The runner writes rows and CSV tables only. Plots are drawn from the CSV by scripts in `analysis/`, so no plotting code lives in the simulator; the tool is P7's choice (gnuplot proposed).
 
 One result row (metric values illustrative; `wall_ms` is the only non-deterministic field and is excluded from determinism checks):
 
@@ -971,7 +1005,7 @@ Correctness is checked four independent ways: hand-calculated golden scenarios, 
 | Unit | Module owner | Classes and functions in isolation | Every push |
 | Golden | P8, from this spec | AC-1 to AC-5 plus edge fixtures: exact fit, three-way coalesce, freeing the first and last block | Every push |
 | Invariant (checked mode) | P2 and P5 define, P8 enforces | I1 to I8 and V1 to V6 after every step of every test | Every push |
-| Property-based | P8 with owners (Hypothesis) | PT1 to PT10 below | Every push (fast profile), nightly (deep profile) |
+| Property-based | P8 with owners (seeded random harness in `tests/property/`) | PT1 to PT10 below | Every push (fast profile), nightly (deep profile) |
 | Differential | P8 | Engine against naive oracles on random workloads | Every push (small), nightly (large) |
 | End-to-end | P8 with P9 | CLI on fixture files compared against golden traces | Every push |
 | Determinism | P10 in CI | Each golden workload run twice, traces diffed byte for byte | Every push |
@@ -1007,7 +1041,7 @@ The correctness matrix is P8's release deliverable; the first rows show its shap
 | FR-C4 coalesce | U-C-020 to U-C-023, PT1, PT4 | Not started |
 | FR-P5 FIFO and LRU | AC-3, AC-4, PT6 to PT8 | Not started |
 
-Test ids follow layer, subsystem and number: U-C-010 is a contiguous unit test. Golden expectations change only through `pytest --update-goldens` in a PR that explains the behaviour change and has P8's approval.
+Test ids follow layer, subsystem and number: U-C-010 is a contiguous unit test. Property tests draw op sequences from `ms_rng` and print the failing seed, so any failure replays exactly; `MEMSIM_PROPERTY_RUNS` sets the fast (CI) and deep (nightly) budgets. Golden expectations change only through `MEMSIM_UPDATE_GOLDENS=1 ctest` in a PR that explains the behaviour change and has P8's approval.
 
 ## 15. Interface
 
@@ -1020,7 +1054,7 @@ v1's interface is a CLI that covers every requirement; the viewer replays level-
 | `compare` | One workload, several policies, metrics side by side | `memsim compare w.jsonl --policies first-fit,best-fit,worst-fit` |
 | `refs` | Textbook shortcut: a reference string typed on the command line | `memsim refs "7 0 1 2 0 3 0 4" --frames 3 --policy lru --table` |
 | `sweep` | Faults against frame count, Belady points flagged | `memsim sweep refs.jsonl --policy fifo --frames 1..8` |
-| `bench` | Run a benchmark spec | `memsim bench benchmarks/e1.yaml --jobs 8` |
+| `bench` | Run a benchmark spec | `memsim bench benchmarks/specs/e1.json --jobs 8` |
 | `gen` | Generate a workload | `memsim gen refs-locality --seed 7 -o w.jsonl` |
 | `replay` | Step through a trace in the terminal | `memsim replay t.jsonl` |
 
@@ -1029,10 +1063,10 @@ Global flags: `--set key=value` overrides header config, `--check` and `--no-che
 | Viewer option (ADR-004) | Strength | Weakness |
 | --- | --- | --- |
 | A. Static HTML replay of level-2 traces | No server, shareable, cannot diverge from the engine | No live what-if edits |
-| B. Streamlit app calling `Session` | Live what-if runs, quick to build in Python, charts included | Needs a Python runtime; its rerun model needs care with state |
-| C. Textual terminal UI | Terminal-native and live | Weak for the report and the demo |
+| B. ncurses terminal UI linked against `Session` | Live what-if runs in the same C build, no second runtime | Weak for the report and the demo; terminal layout work |
+| C. Local web server in C serving option A plus a live `Session` endpoint | Live and shareable | An HTTP layer to build and secure, for a demo feature |
 
-P1 suggests A for v1, adding B only if the demo needs live what-if runs. Either way the viewer renders snapshots and holds no allocation or replacement logic.
+P1 suggests A for v1: it is HTML and JavaScript reading trace files, so it needs nothing from the C build. B is the cheap upgrade if the demo needs live what-if runs. Either way the viewer renders snapshots and holds no allocation or replacement logic.
 
 Viewer screens (Proposed, P9 to refine):
 
@@ -1044,97 +1078,90 @@ Viewer screens (Proposed, P9 to refine):
 
 ## 16. Repository, tooling and CI
 
-One Python package in one repo, with CODEOWNERS mirroring section 5 and a CI pipeline that blocks merges on lint, types, layering, tests, determinism and a benchmark smoke run.
+One CMake project in one repo: each module is a static library with exported headers in its own `include/` and private headers beside its sources, CODEOWNERS mirrors section 5, and a CI pipeline blocks merges on format, layering, build, tests, determinism and a benchmark smoke run. `docs/CONVENTIONS.md` holds the coding rules.
 
 ```text
-memsim/
-  pyproject.toml            uv, ruff, mypy, pytest, import-linter config      P10
-  src/memsim/
-    common/                 types, config, errors, events, bus, registry      P1
-    session.py                                                                P1
-    trace/                  TraceWriter, snapshots                            P1
+memforge/
+  CMakeLists.txt, CMakePresets.json   build, dev (ASan + UBSan) and release presets     P10, P1
+  cmake/MemsimModule.cmake            memsim_module(): one library per module           P10, P1
+  src/
+    common/                           types, config, errors, events, bus, registry, rng  P1
+    session/, trace/                                                                   P1
     contiguous/
-      model.py, view.py, invariants.py, engine.py                             P2
-      policies/             first_fit, best_fit, worst_fit, next_fit          P3
-      fragmentation.py, compaction.py                                         P4
+      model, view.h, invariants, engine                                               P2
+      placement.h, policies/          first_fit, best_fit, worst_fit, next_fit         P3
+      fragmentation, compaction                                                        P4
     paging/
-      mmu.py, tables.py, frames.py, engine.py, invariants.py                  P5
-      policies/             fifo, lru, opt, clock                             P6
-      belady.py                                                               P6
-    workloads/, metrics/, bench/                                              P7
-    cli/                                                                      P9
-  viewer/                                                                     P9
+      mmu, tables, frames, engine, invariants                                          P5
+      replacement.h, policies/, belady  fifo, lru, opt, clock                          P6
+    workloads/, metrics/, bench/                                                       P7
+    cli/                                                                               P9
   tests/
-    unit/                                                                     owners
-    golden/, property/, oracle/, integration/                                 P8
+    test.h                            dependency-free harness                          P8
+    unit/<module>/                    may use that module's private headers            owners
+    golden/, property/, oracle/, integration/   exported headers only                  P8
   benchmarks/
-    specs/                  committed bench specs                             P7
-    results/                gitignored run outputs                            P7
-  docs/                     architecture, ADRs, formats, metrics              P10 + owners
-  .github/                  CI workflow, CODEOWNERS, issue and PR templates   P10
+    specs/                            committed bench specs (JSON)                     P7
+    results/                          gitignored run outputs                           P7
+  analysis/                           plot scripts over result CSVs                    P7
+  viewer/                                                                              P9
+  third_party/                        vendored libraries, pinned                       P10, P1
+  scripts/check_layers.sh             layering and core-purity check                   P10
+  docs/                               architecture, conventions, ADRs, formats         P10 + owners
+  .github/                            CI workflow, CODEOWNERS, issue and PR templates  P10
 ```
 
-CODEOWNERS (the last matching rule wins; replace the placeholders with GitHub handles):
+Each module directory looks the same:
 
 ```text
-/src/memsim/common/                      @p1
-/src/memsim/session.py                   @p1
-/src/memsim/trace/                       @p1
-/src/memsim/contiguous/                  @p2
-/src/memsim/contiguous/policies/         @p3
-/src/memsim/contiguous/fragmentation.py  @p4
-/src/memsim/contiguous/compaction.py     @p4
-/src/memsim/paging/                      @p5
-/src/memsim/paging/policies/             @p6
-/src/memsim/paging/belady.py             @p6
-/src/memsim/workloads/                   @p7
-/src/memsim/metrics/                     @p7
-/src/memsim/bench/                       @p7
-/tests/                                  @p8
-/src/memsim/cli/                         @p9
-/viewer/                                 @p9
-/.github/                                @p10
-/docs/                                   @p10
-/pyproject.toml                          @p10 @p1
+src/<module>/
+  CMakeLists.txt                  memsim_module(<module> DEPS ... SOURCES ...)
+  include/memsim/<module>/*.h     exported: seen by every module that links this one
+  *.h, *.c                        private to the module and its unit tests
 ```
+
+`DEPS` is the layering contract: a module that does not link another cannot even find its headers. CODEOWNERS (in `.github/`) gives each module's folder, including its `CMakeLists.txt`, to its owner; `scripts/check_layers.sh` keeps an allowed-dependency table, so widening `DEPS` also needs a reviewed change to that script.
 
 CI stages on every push and pull request, in order:
 
-1. Lint: `ruff check` and `ruff format --check`.
-2. Types: `mypy --strict src/`.
-3. Layering: `lint-imports`, enforcing the import rules from section 5.
-4. Tests: unit, golden, property (fast profile), differential (small) and integration, with the coverage gate on engines.
-5. Determinism: every golden workload run twice and the traces diffed.
-6. Benchmark smoke: a tiny spec in checked mode.
+1. Format: `clang-format --dry-run --Werror` over `src/` and `tests/`.
+2. Layering: `scripts/check_layers.sh`.
+3. Build: the `dev` preset with gcc and with clang, warnings as errors, ASan and UBSan on.
+4. Static analysis: `clang-tidy` over `compile_commands.json`.
+5. Tests: `ctest` runs unit, golden, property (fast budget), differential (small) and integration, then gcovr applies the coverage gate on engines.
+6. Determinism: every golden workload run twice and the traces diffed.
+7. Benchmark smoke: a tiny spec in checked mode.
 
-Nightly jobs run the deep Hypothesis profile and large differential runs; a release tag runs full validation and builds the changelog.
+Nightly jobs run the deep property budget, large differential runs and the test suite under Valgrind; a release tag runs full validation and builds the changelog.
 
 Conventions (Proposed, P10 to refine):
 
 - Trunk-based: short-lived branches named `feat/<module>-<topic>`, merged at least weekly; `main` is protected and always green.
-- Reviews: one owner approval; P1 also reviews any change to `common/`, a Protocol, an event or a file format, and the PR template asks for the RFC link.
+- Reviews: one owner approval; P1 also reviews any change to `src/common/`, an exported header that other modules use, an event or a file format, and the PR template asks for the RFC link.
 - Conventional Commits and SemVer (0.x until v1.0); workload and trace schemas carry their own version numbers.
-- Toolchain: Python 3.12, `uv` for environments and the lockfile, `ruff`, `mypy`, `pytest`, `hypothesis`, `sortedcontainers`, `import-linter`.
+- Toolchain: C17, CMake 3.25 or later, Ninja, gcc and clang, clang-format, clang-tidy, gcovr, Valgrind; vendored libraries only, no system packages beyond the toolchain.
 
 ## 17. Architecture decision log
 
-Eleven decisions shape the system; ten are Proposed and one (the viewer stack) is Open. The kickoff meeting moves each to Accepted or Rejected; anything Accepted later changes only by RFC.
+Thirteen decisions shape the system; one is Accepted, eleven are Proposed and one (the viewer stack) is Open. The kickoff meeting moves each to Accepted or Rejected; anything Accepted later changes only by RFC.
 
 | ID | Decision | Status | Alternatives considered | Decides |
 | --- | --- | --- | --- | --- |
-| ADR-001 | Python 3.12 with uv, ruff, mypy strict, pytest and Hypothesis | Proposed | C or C++: closest to a real allocator, but plots and UI need a second language and the simulator itself can corrupt memory. Java: strong typing, weaker plotting. TypeScript: runs in the browser, weaker analysis stack | Team vote, P1 and P10 |
+| ADR-001 | C17 with CMake, Ninja, gcc and clang, sanitizers, clang-format and clang-tidy | Accepted (P1, Oct 25, 2026) | Python: fastest to write, with the best plotting and property-testing tools, but further from a real allocator. C++: same speed with RAII and containers, but a larger language for a ten-person team. Java: strong typing, weaker plotting. TypeScript: runs in the browser, weaker analysis stack | P1 |
 | ADR-002 | Contiguous layout: address-ordered linked list, hash indexes by id and pid, size-ordered free index | Proposed | Sorted array; bitmap of units; balanced tree | P2 |
 | ADR-003 | Workloads refer to allocations by logical id, never by address; ids are never reused | Proposed | Address-based frees, which break cross-policy replay and compaction | P1, P7 |
-| ADR-004 | Viewer technology | Open | Static HTML replay, Streamlit, Textual (section 15) | P9 |
+| ADR-004 | Viewer technology | Open | Static HTML replay, ncurses TUI, local web server (section 15) | P9 |
 | ADR-005 | The event log is the integration contract; metrics, viewer and golden tests consume events | Proposed | Each module computes its own statistics | P1 |
-| ADR-006 | Three-tier error model: input error, domain outcome, contract violation | Proposed | Exceptions for everything; silent error codes | P1 |
+| ADR-006 | Three-tier error model: input error, domain outcome, contract violation | Proposed | Abort on everything; silent error codes | P1 |
 | ADR-007 | Determinism: integer state, logical clocks, fixed tie-breaks, canonical serialisation, seeded randomness only in generators | Proposed | None viable for golden tests | P1 |
 | ADR-008 | Global replacement over one frame pool in v1 | Proposed | Local replacement with quotas (FR-P10) | P5 |
 | ADR-009 | Half-open ranges and abstract integer units | Proposed | Inclusive ranges; byte-addressed memory | P2 |
 | ADR-010 | Policies decide, engines mutate | Proposed | Policies mutate state directly | P1 |
 | ADR-011 | Full, order-preserving sliding compaction | Proposed | Minimal-move compaction (stretch) | P4 |
+| ADR-012 | JSON through vendored cJSON, for workloads, traces, results and bench specs | Proposed | jsmn (tokeniser only, no writer); a hand-written parser; YAML for specs, which needs a second library | P7, P1 |
+| ADR-013 | String ids interned to dense integers at load; the engine never sees strings | Proposed | Hash tables keyed by strings inside the engine | P1, P2 |
 
-ADR-001 is cheap to reverse: workloads, traces and results are files, so the viewer and analysis survive a language change, and the Protocols map to abstract classes in Java or C++ or to function-pointer tables in C. If the instructor mandates C or C++, only the bindings change.
+ADR-001 chose C so the simulator is written in the language of the systems it models, and so the real-arena backend (FR-S1) needs no second language. The cost is memory safety and tooling, paid for by sanitizers on every CI run, Valgrind nightly, invariants checked after every step, and a few vendored libraries. Workloads, traces and results stay files, so the viewer and the plots can use whatever tool suits them.
 
 ADR-003 is the decision most worth defending: different policies place the same request at different addresses, compaction moves blocks, and an allocation may fail under one policy only. Logical ids keep one workload file valid under all of them.
 
@@ -1146,23 +1173,25 @@ v1.0 ships six weeks after kickoff through six milestones and two gates: contrac
 
 Each box states its milestone's exit criteria; a milestone is done only when all of them pass in CI on `main`.
 
-The critical path runs contracts (P1) → memory model (P2) → placement and compaction (P3, P4) → experiments E1 and E2 (P7) → report. The paging path (P5 → P6 → E4, E5) runs in parallel and is shorter. P3, P4 and P6 start in week 1 against the frozen Protocols and fakes, while P8 and P9 start against committed sample files.
+The critical path runs contracts (P1) → memory model (P2) → placement and compaction (P3, P4) → experiments E1 and E2 (P7) → report. The paging path (P5 → P6 → E4, E5) runs in parallel and is shorter. P3, P4 and P6 start in week 1 against the frozen interfaces and fakes, while P8 and P9 start against committed sample files.
 
 M0 exit checklist:
 
 - [ ] Every owner has commented on their sections and answered their questions in section 19
-- [ ] ADR-001 (language) and ADR-004 (viewer) decided, ADR statuses updated in section 17
-- [ ] `common/` types and events, `MemoryView`, `FrameView` and both policy Protocols merged (P1)
-- [ ] Repo skeleton, CODEOWNERS and CI green on an empty package (P10)
+- [x] ADR-001 (language) decided: C
+- [ ] ADR-004 (viewer) decided, ADR statuses updated in section 17
+- [ ] `common/` types and events, `MemoryView`, `FrameView` and both policy vtables merged (P1)
+- [ ] Repo skeleton, CODEOWNERS and CI green on an empty build (P10); skeleton committed, CI not yet run on GitHub
 - [ ] Sample workload files and a level-2 trace committed for P8 and P9 (P1, P7)
 - [ ] AC-1 to AC-5 golden fixtures written from this spec (P8)
 - [ ] Weeks mapped to calendar dates against the submission deadline (P1)
 
 | Risk, most severe first | Mitigation | Owner |
 | --- | --- | --- |
-| P2 or P5 slips, and the critical path with them | Protocols and fakes at M0; P3 pairs with P2 and P6 with P5 in week 1 | P1 |
+| P2 or P5 slips, and the critical path with them | Interfaces and fakes at M0; P3 pairs with P2 and P6 with P5 in week 1 | P1 |
 | Interfaces churn after M2 | RFC process, schema versions, freeze gate after M2 | P1 |
-| Hidden non-determinism from set iteration order or float accumulation | Integer state, sorted iteration on output, determinism job in CI | P10, P8 |
+| Memory-safety bugs corrupt state and make results wrong without failing | Sanitizers on every CI run, Valgrind nightly, invariants after every step in checked mode | P10, P8 |
+| Hidden non-determinism from uninitialised memory, pointer-order iteration or float accumulation | Integer state, sorted iteration on output, determinism job in CI | P10, P8 |
 | Integration crunch in the last week | Trunk-based development, weekly merges, CI gate on `main` | P10 |
 | Report numbers disagree across sections | One `MetricsCollector`; section 13 definitions are the source of truth | P7 |
 | Viewer scope creep starves correctness work | Replay-only v1; viewer work starts at M3 | P9 |
@@ -1173,7 +1202,8 @@ M0 exit checklist:
 
 Each owner answers their three questions in a comment before kickoff and ticks them off. An answer that changes this doc becomes an edit; after kickoff, an answer that changes a shared contract becomes an RFC.
 
-- [ ] P1: Put ADR-001 (language) and ADR-004 (viewer) to a vote at kickoff and update their status.
+- [x] P1: ADR-001 (language) decided: C.
+- [ ] P1: Put ADR-004 (viewer) to a vote at kickoff and update its status.
 - [ ] P1: Map weeks 1 to 6 onto the submission date; if fewer than six weeks remain, decide which SHOULD items drop first.
 - [ ] P1: Are E6 and FR-S1 (real-arena backend) in scope, or explicitly out?
 - [ ] P2: Linked list or sorted array for the block layout (ADR-002)?
@@ -1193,13 +1223,14 @@ Each owner answers their three questions in a comment before kickoff and ticks t
 - [ ] P6: Search budget for E5, and what counts as a reportable anomaly?
 - [ ] P7: Final generator list and parameters; are 10 seeds per configuration enough?
 - [ ] P7: Sample time series every step, or every k steps on long runs?
-- [ ] P7: Which plots does the report need, so E1 to E5 export exactly those?
-- [ ] P8: Confirm the oracle set and the Hypothesis budgets for CI and nightly runs.
+- [ ] P7: Which plots does the report need, so E1 to E5 export exactly those, and which plotting tool draws them?
+- [ ] P7: Accept cJSON for every JSON file (ADR-012), or propose another library?
+- [ ] P8: Confirm the oracle set and the property-test budgets for CI and nightly runs; keep the in-house harness or adopt a C property-testing library?
 - [ ] P8: Is a 90% engine coverage gate right, and do we add mutation testing?
 - [ ] P8: Re-derive AC-1 to AC-4 by hand and flag any disagreement in a comment.
 - [ ] P9: Pick viewer option A, B or C (ADR-004).
 - [ ] P9: Cap viewer traces at a step count (proposal: 5,000) to bound level-2 file size?
 - [ ] P9: Which comparison views matter most for the demo?
-- [ ] P10: `uv` or pip-tools, and a MkDocs site or plain Markdown?
+- [ ] P10: Confirm CMake, Ninja and the warning set; Doxygen for API docs, or plain Markdown?
 - [ ] P10: Branch-protection rules and required checks.
 - [ ] P10: Release checklist contents.

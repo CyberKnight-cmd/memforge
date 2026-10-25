@@ -1,0 +1,13 @@
+Checks: >
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  misc-*,
+  performance-*,
+  readability-*,
+  -bugprone-easily-swappable-parameters,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -misc-include-cleaner
+WarningsAsErrors: '*'
+HeaderFilterRegex: 'include/memsim/.*'

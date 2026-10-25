@@ -1,0 +1,39 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "build/${presetName}"
+    },
+    {
+      "name": "dev",
+      "inherits": "base",
+      "displayName": "Debug with ASan and UBSan (day-to-day work)",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "MEMSIM_SANITIZE": "ON" }
+    },
+    {
+      "name": "release",
+      "inherits": "base",
+      "displayName": "Optimised build for benchmarks",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "valgrind",
+      "inherits": "base",
+      "displayName": "Debug, every test under Valgrind memcheck",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "MEMSIM_VALGRIND": "ON" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "dev", "configurePreset": "dev" },
+    { "name": "release", "configurePreset": "release" },
+    { "name": "valgrind", "configurePreset": "valgrind" }
+  ],
+  "testPresets": [
+    { "name": "dev", "configurePreset": "dev", "output": { "outputOnFailure": true } },
+    { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true } },
+    { "name": "valgrind", "configurePreset": "valgrind", "output": { "outputOnFailure": true } }
+  ]
+}

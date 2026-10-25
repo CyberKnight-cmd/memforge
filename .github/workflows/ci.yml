@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to a PR cancels that PR's run still in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    name: Lint (format, hygiene, layering)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: pre-commit (same hooks and pinned versions as local)
+        run: pipx run pre-commit run --all-files --show-diff-on-failure
+
+  build-test:
+    name: Build and test (${{ matrix.cc }}, ${{ matrix.preset }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [gcc, clang]
+        preset: [dev, release]   # dev = Debug + ASan/UBSan; release = -O2, which finds other warnings
+    env:
+      CC: ${{ matrix.cc }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      # ASan aborts at startup when the kernel uses more mmap randomisation than it supports.
+      - name: Allow AddressSanitizer
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }} -DMEMSIM_WERROR=ON
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }}
+
+  valgrind:
+    name: Valgrind memcheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build valgrind
+      - name: Configure
+        run: cmake --preset valgrind -DMEMSIM_WERROR=ON
+      - name: Build
+        run: cmake --build --preset valgrind
+      - name: Test under Valgrind
+        run: ctest --preset valgrind
+
+  clang-tidy:
+    name: clang-tidy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CC: clang
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang-tidy
+      - name: Configure (writes compile_commands.json)
+        run: cmake --preset release
+      - name: clang-tidy
+        run: find src -name '*.c' -print0 | xargs -0 clang-tidy -p build/release --quiet
+
+  # The one check branch protection requires, so the matrix can change without touching settings.
+  ci-ok:
+    name: CI passed
+    if: always()
+    needs: [lint, build-test, valgrind, clang-tidy]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Every job succeeded
+        run: |
+          echo '${{ toJSON(needs) }}'
+          [ '${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}' = 'false' ]
+
+# Still to add as the code lands: the determinism double-run diff (NFR-1), the gcovr coverage
+# gate, the benchmark smoke run, and libFuzzer on the workload loader.

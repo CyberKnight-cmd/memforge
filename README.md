@@ -115,3 +115,7 @@ the team settles, so GitHub does not yet require the owner's review; ask the own
 
   Run `pre-commit run --all-files` and `ctest --preset dev` first and most PRs pass on the first
   try.
+
+## License
+
+[MIT](LICENSE)

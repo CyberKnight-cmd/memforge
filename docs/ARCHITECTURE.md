@@ -1,11 +1,81 @@
-# MemForge — System Architecture v0.2 (draft for team review)
+# MemForge — System Architecture v0.3 (one-week delivery)
 
 Oct 25, 2026 · @Arya Gupta
 
-v0.2 sets the implementation language to C (ADR-001). Code samples, data structures, tooling and
-the repository layout follow from that; the behaviour, formats and acceptance criteria are unchanged.
+v0.2 set the implementation language to C (ADR-001). v0.3 cuts the plan from six weeks to one: the
+**One-week plan** below overrides anything later in this document that it contradicts.
+
+## One-week plan
+
+**Deadline: Sunday, November 1, 2026.** We submit the code, a **30-page report** and a **live demo**.
+Day 1 is Monday, October 26. Everything here is decided; there is no kickoff ratification and no RFC
+process this week. P1 settles interface questions in the PR, and interfaces freeze at the end of Day 2.
+
+### Scope
+
+| Area | In | Simplified | Cut |
+| --- | --- | --- | --- |
+| Contiguous | First-, Best- and Worst-Fit; split and coalesce; fragmentation metrics | Compaction is an explicit `compact` op only (enough for AC-2) | Next-Fit, alignment and `min_split`, `on_failure` and threshold triggers, indexed O(log h) structures |
+| Paging | FIFO, LRU and OPT; translation; Belady sweep (AC-3, AC-4) | Global replacement only | Clock, LFU, local quotas, TLB, two-level tables |
+| Workloads | Golden fixtures; two seeded generators (`alloc-uniform`, `refs-locality`) | A plain-text workload format (section 12), so C never parses JSON | JSONL workloads, cJSON (ADR-012) |
+| Traces | JSONL written with `printf`: header, events, a snapshot after every step, summary | One trace level instead of three | Trace levels 0, 1 and 2 |
+| Experiments | E1 (placement policies) and E4 (faults against frames), feeding the report | Shell scripts in `scripts/experiments/` loop the CLI over seeds and write CSV; `analysis/` plots it | Bench runner and JSON specs, E2, E3, E5 search, E6 |
+| CLI | `run`, `compare`, `refs`, `sweep`, `gen` | | `bench`, `validate`, `replay` |
+| Viewer | Replays a trace: memory map, fragmentation over time, paging grid, step controls | One static `viewer/index.html`, plain JavaScript, no build step (ADR-004) | React, WebAssembly, live what-if mode, side-by-side compare |
+| QA | AC-1 to AC-8 in CI, invariants after every step, sanitizers, Valgrind, determinism double-run | | Property-based, differential and mutation testing, coverage gate, fuzzing |
+
+The assignment only requires First-Fit, Best-Fit and fragmentation testing (section 1). If the week
+slips, **paging is the first thing to drop**, then the viewer's paging screen, then E4.
+
+### Day by day
+
+| Day | Date | Goal | Done when |
+| --- | --- | --- | --- |
+| 1 | Mon Oct 26 | P1 merges the shared headers (types, ops, events, `MemoryView`, `FrameView`, both policy vtables, `Session`). Everyone replies on Discussion #2. P8 re-derives AC-1 to AC-5 by hand. P7 merges the workload format. P10 sets up the report template. | Headers on `main`; every owner has posted |
+| 2 | Tue Oct 27 | Engines, policies, loader, trace writer and CLI built in parallel against the headers; small PRs merged several times a day. **Interfaces freeze tonight.** | Each module compiles against the real headers with stubs |
+| 3 | Wed Oct 28 | Modules complete with unit tests; P8's golden tests merged and failing only where code is missing. | AC-1 and AC-3 pass |
+| 4 | Thu Oct 29 | Integration: AC-1 to AC-8 green in CI. Sample traces committed; viewer reads them. | All acceptance criteria pass on `main` |
+| 5 | Fri Oct 30 | E1 and E4 run; plots generated. Viewer complete. Every report section drafted. | Figures and all report drafts committed |
+| 6 | Sat Oct 31 | **Feature freeze.** Report assembled and edited; demo rehearsed end to end; bug fixes only. | Full report draft; one clean demo run |
+| 7 | Sun Nov 1 | Final proofread, final demo rehearsal, submission. | Submitted |
+
+### Report: 30 pages
+
+Every owner writes their own section from their own code, with figures generated from committed data.
+Drafts are due **end of Day 5**; P10 assembles and edits on Day 6.
+
+| # | Section | Pages | Writer |
+| --- | --- | --- | --- |
+| 1 | Introduction: problem, goals, scope | 2 | P1 |
+| 2 | System architecture and design decisions | 3 | P1 |
+| 3 | Contiguous memory model and engine | 3 | P2 |
+| 4 | Placement policies | 2.5 | P3 |
+| 5 | Fragmentation and compaction | 2.5 | P4 |
+| 6 | Paging and address translation | 3 | P5 |
+| 7 | Page replacement and Belady's anomaly | 3 | P6 |
+| 8 | Workloads, metrics and experimental results (E1, E4) | 4 | P7 |
+| 9 | Testing and verification | 3 | P8 |
+| 10 | Interface: CLI and viewer | 2 | P9 |
+| 11 | Engineering process: build, CI, tooling | 1.5 | P10 |
+| 12 | Conclusion, limitations and future work | 0.5 | P1 |
+
+Appendices (acceptance-criteria tables, sample traces, user guide) do not count toward the 30 pages.
+P10 picks the report format on Day 1. The default is Markdown in `report/` built to PDF with pandoc,
+so figures regenerate from the experiment CSVs.
+
+### Live demo (P9 and P1, about 10 minutes)
+
+1. `memsim compare` on the AC-1 workload prints the First-, Best- and Worst-Fit table (AC-8).
+2. The viewer replays First-Fit failing the 426 request through fragmentation, then compaction placing it (AC-2).
+3. `memsim refs ... --table` shows FIFO, LRU and OPT on the AC-3 string; `memsim sweep` shows Belady's anomaly (AC-4).
+4. One E1 plot and one E4 plot from the report.
+
+Every demo step runs from a committed script with committed inputs, and is rehearsed on Days 6 and 7.
+A recorded run is kept as a fallback in case live demo hardware fails.
 
 ## 0. Status and how to review
+
+*For this week the process below is suspended: the One-week plan above applies.*
 
 This is P1's proposal for the whole system, open to challenge until the kickoff meeting ratifies it. Every decision carries one of three labels; most are Proposed, so push back with a concrete alternative and a reason.
 
@@ -43,7 +113,7 @@ Non-goals for v1 (each can be promoted by RFC):
 
 ## 2. Requirements
 
-v1 commits to 18 MUST requirements; the 8 SHOULD items are planned work and the 8 COULD items start only after milestone M2. Owners can re-prioritise from the Priority dropdown; demoting a MUST needs P1's agreement.
+For the one-week plan, every MUST below ships, the one SHOULD ships if time allows, and CUT items are out. Owners can re-prioritise from the Priority dropdown; demoting a MUST needs P1's agreement.
 
 | ID | Requirement | Priority | Owner |
 | --- | --- | --- | --- |
@@ -53,34 +123,34 @@ v1 commits to 18 MUST requirements; the 8 SHOULD items are planned work and the 
 | FR-C4 | Immediate coalescing of adjacent free blocks on every free | MUST | P2 |
 | FR-C5 | Invalid requests rejected with a reason and no state change: bad size, duplicate id, unknown id, double free, wrong owner | MUST | P2 |
 | FR-C6 | First-Fit and Best-Fit placement | MUST | P3 |
-| FR-C7 | Worst-Fit placement | SHOULD | P3 |
-| FR-C8 | Next-Fit placement | COULD | P3 |
+| FR-C7 | Worst-Fit placement | MUST | P3 |
+| FR-C8 | Next-Fit placement | CUT | P3 |
 | FR-C9 | Fragmentation metrics: total free, largest hole, hole count, external and internal fragmentation, failure cause | MUST | P4 |
-| FR-C10 | Sliding compaction (explicit op and on-failure trigger), emitted as events with its cost | SHOULD | P4 |
-| FR-C11 | Alignment and minimum split size, the sources of internal fragmentation | COULD | P2 |
+| FR-C10 | Sliding compaction as an explicit op, emitted as events with its cost | MUST | P4 |
+| FR-C11 | Alignment and minimum split size, the sources of internal fragmentation | CUT | P2 |
 | FR-P1 | Config: page size (power of 2), frame count, per-process address space in pages | MUST | P5 |
 | FR-P2 | Single-level page table per process; PTE holds frame, present, referenced, dirty | MUST | P5 |
 | FR-P3 | VA to PA translation; references given as virtual address or as page number | MUST | P5 |
 | FR-P4 | Fault handling: lowest free frame, else the policy's victim; dirty victims count as write-backs | MUST | P5 |
 | FR-P5 | FIFO and LRU replacement | MUST | P6 |
-| FR-P6 | OPT replacement (offline: needs the whole reference string) | SHOULD | P6 |
-| FR-P7 | Frame sweep (faults vs frames) with Belady anomaly detection | SHOULD | P6 |
-| FR-P8 | Clock (second chance) and LFU replacement | COULD | P6 |
+| FR-P6 | OPT replacement (offline: needs the whole reference string) | MUST | P6 |
+| FR-P7 | Frame sweep (faults vs frames) with Belady anomaly detection | MUST | P6 |
+| FR-P8 | Clock (second chance) and LFU replacement | CUT | P6 |
 | FR-P9 | Multiple processes under global replacement | SHOULD | P5 |
-| FR-P10 | Local replacement with per-process frame quotas | COULD | P5 |
-| FR-W1 | Versioned JSONL workload format with a validator | MUST | P7 |
-| FR-W2 | Seeded generators for allocation and page-reference workloads | MUST | P7 |
-| FR-W3 | Benchmark runner over workload x policy x config x seed, exporting result rows | MUST | P7 |
-| FR-W4 | Aggregates (mean, std, 95% CI) and plots | SHOULD | P7 |
-| FR-U1 | CLI commands `run`, `compare`, `refs`, `sweep`, `bench` | MUST | P9 |
-| FR-U2 | CLI commands `validate`, `gen`, `replay` | SHOULD | P9 |
-| FR-U3 | Viewer: step-through replay and side-by-side comparison | SHOULD | P9 |
-| FR-Q1 | Golden, property, differential, integration and determinism tests gate every merge | MUST | P8 |
-| FR-R1 | CI pipeline, contribution guide, API docs, release checklist | MUST | P10 |
-| FR-S1 | Real-arena backend: same placement policies over an `mmap`'d arena, differential-tested against the simulator | COULD | P2, P3 |
-| FR-S2 | TLB with hit ratio and effective access time | COULD | P5 |
-| FR-S3 | Two-level page table | COULD | P5 |
-| FR-S4 | Buddy allocator | COULD | P3 |
+| FR-P10 | Local replacement with per-process frame quotas | CUT | P5 |
+| FR-W1 | Versioned plain-text workload format with a validator | MUST | P7 |
+| FR-W2 | Seeded generators: `alloc-uniform` and `refs-locality` | MUST | P7 |
+| FR-W3 | Experiment scripts over workload x policy x seed, exporting CSV | MUST | P7 |
+| FR-W4 | Aggregates (mean, std, 95% CI) and plots | MUST | P7 |
+| FR-U1 | CLI commands `run`, `compare`, `refs`, `sweep`, `gen` | MUST | P9 |
+| FR-U2 | CLI command `validate` | SHOULD | P9 |
+| FR-U3 | Viewer: step-through replay of a trace, for the live demo | MUST | P9 |
+| FR-Q1 | Golden, invariant, integration and determinism tests gate every merge | MUST | P8 |
+| FR-R1 | CI pipeline, contribution guide, report assembly, submission checklist | MUST | P10 |
+| FR-S1 | Real-arena backend: same placement policies over an `mmap`'d arena, differential-tested against the simulator | CUT | P2, P3 |
+| FR-S2 | TLB with hit ratio and effective access time | CUT | P5 |
+| FR-S3 | Two-level page table | CUT | P5 |
+| FR-S4 | Buddy allocator | CUT | P3 |
 
 | ID | Non-functional requirement | Target or enforcement |
 | --- | --- | --- |
@@ -90,7 +160,7 @@ v1 commits to 18 MUST requirements; the 8 SHOULD items are planned work and the 
 | NFR-4 | Extensibility: a new policy is one class, one registry line, one golden test | Zero engine edits |
 | NFR-5 | Performance: 100k-op workload at trace level 0 | Under 30 s on a team laptop; re-tune after first measurement |
 | NFR-6 | Reproducibility: every report figure regenerates from a bench spec plus a git SHA | Both stored in every result row |
-| NFR-7 | Code quality: no warnings under `-Wall -Wextra -Wpedantic -Werror` with gcc and clang, clang-tidy clean, engine line coverage (gcovr) | At least 90% (Proposed) |
+| NFR-7 | Code quality: no warnings under `-Wall -Wextra -Wpedantic -Werror` with gcc and clang, clang-tidy clean | Enforced in CI |
 | NFR-8 | Memory safety: no leaks, overflows or undefined behaviour | ASan and UBSan on every CI test run, Valgrind nightly, zero reports |
 
 ## 3. Acceptance criteria
@@ -155,9 +225,9 @@ flowchart TB
     MC["MetricsCollector - P7"]
     IC["InvariantChecker - defined by P2 and P5, run by P8"]
   end
-  WLF[("workload .jsonl")]
+  WLF[("workload .txt")]
   TRF[("trace .jsonl")]
-  RSF[("results .jsonl and .csv")]
+  RSF[("results .csv")]
 
   GEN --> WLF
   WLF --> LOAD
@@ -809,11 +879,7 @@ Belady analysis (P6, Proposed):
 
 A trace is one JSONL file: a header line, one line per event in `seq` order, optional snapshot lines, and a closing summary. It is the single integration surface for metrics, the viewer and golden tests.
 
-| Trace level | Contains | Used by |
-| --- | --- | --- |
-| 0 | Header and `RunSummary` only | Benchmarks |
-| 1 | Level 0 plus every event | Golden tests, debugging, CLI replay |
-| 2 | Level 1 plus a `Snapshot` after every step and verbose details (holes scanned, policy state) | Viewer |
+This week there is a single trace level: header, every event, a `Snapshot` after every step (with holes scanned and policy state), and the closing `RunSummary`. Golden tests, the viewer and the report all read the same file. Experiments pass `--no-trace` and keep only the summary.
 
 | Event | Key fields | Emitted by |
 | --- | --- | --- |
@@ -866,29 +932,38 @@ Format rules (Proposed):
 
 ## 12. Workloads
 
-A workload is a JSONL file: a header with the scenario's config (never the policy), then one op per line. The same file therefore replays under every policy, and fixtures diff cleanly in git.
+A workload is a plain-text file: `key value` header lines, then one op per line. `#` starts a comment. The header holds the scenario's config (never the policy), so the same file replays under every policy, and fixtures diff cleanly in git. A text format means the C loader is a line splitter, not a JSON parser.
 
 Contiguous, from the AC-1 fixture (abridged: the full file has 9 setup allocations, 5 frees and 4 requests):
 
-```json
-{"type":"header","schema":1,"kind":"contiguous","name":"silberschatz_5_holes","config":{"memory_size":1740,"alignment":1}}
-{"op":"alloc","pid":"SYS","id":"h1","size":100}
-{"op":"alloc","pid":"SYS","id":"s1","size":10}
-{"op":"free","pid":"SYS","id":"h1"}
-{"op":"alloc","pid":"P1","id":"a1","size":212}
-{"op":"alloc","pid":"P4","id":"a4","size":426}
+```text
+# silberschatz_5_holes: AC-1 fixture
+schema 1
+kind contiguous
+memory_size 1740
+
+alloc SYS h1 100
+alloc SYS s1 10
+free SYS h1
+alloc P1 a1 212
+alloc P4 a4 426
 ```
 
-The AC-2 fixture appends `{"op":"compact"}` and a fresh request with id `a4-retry`, because ids are never reused; a separate test covers the same scenario with `compaction = on_failure`.
+The AC-2 fixture appends `compact` and a fresh request with id `a4-retry`, because ids are never reused.
 
 Paging, a format illustration rather than a fixture:
 
-```json
-{"type":"header","schema":1,"kind":"paging","name":"format_example","config":{"page_size":4096,"frames":3},"processes":{"P0":{"pages":8}}}
-{"op":"access","pid":"P0","vpn":7}
-{"op":"access","pid":"P0","va":6700,"rw":"w"}
-{"op":"spawn","pid":"P1","pages":16}
-{"op":"terminate","pid":"P1"}
+```text
+schema 1
+kind paging
+page_size 4096
+frames 3
+
+spawn P0 8
+access P0 7          # by vpn, read
+access P0 @6700 w    # by virtual address (@ prefix), write
+spawn P1 16
+terminate P1
 ```
 
 | Op | Fields | Subsystem |
@@ -897,25 +972,17 @@ Paging, a format illustration rather than a fixture:
 | `free` | pid, id | Contiguous |
 | `compact` | None | Contiguous |
 | `spawn` | pid, pages | Paging |
-| `access` | pid, exactly one of vpn or va, rw (`r` by default, or `w`) | Paging |
+| `access` | pid, then a vpn or `@va`, then an optional `w` (read by default) | Paging |
 | `terminate` | pid | Both |
-| `mark` | label: forces a labelled snapshot for the viewer and metrics | Both |
 
-The validator runs in strict mode by default and rejects, with file and line, a missing header, an unknown schema or op, an op that does not match `kind`, a reused alloc id, a non-positive size, or a free of an id never allocated earlier in the file. Negative-test fixtures set `"negative_test": true` in the header, which lets semantic misuse through so AC-5 can check that it is recorded as a domain outcome.
+The validator runs in strict mode by default and rejects, with file and line, a missing header, an unknown schema or op, an op that does not match `kind`, a reused alloc id, a non-positive size, or a free of an id never allocated earlier in the file. Negative-test fixtures set `negative_test 1` in the header, which lets semantic misuse through so AC-5 can check that it is recorded as a domain outcome.
 
 | Generator | Shape | Key parameters |
 | --- | --- | --- |
 | `alloc-uniform` | Sizes uniform in \[a, b\]; each step allocates with probability p, else frees a random live block | ops, a, b, p\_alloc |
-| `alloc-steady` | Fill to a target utilisation, then alternate frees and allocations around it | ops, size distribution, target\_util |
-| `alloc-bimodal` | Mostly small requests with occasional large ones, a fragmentation stress test | ops, p\_large, small and large ranges |
-| `alloc-lifetime` | Each allocation draws an exponential lifetime; its free is scheduled to match | ops, mean\_lifetime, size distribution |
-| `refs-uniform` | Uniform over P pages | n, P |
 | `refs-locality` | Working set of W pages that shifts every T references, with occasional jumps | n, P, W, T, p\_out |
-| `refs-loop` | Cyclic scan over L pages; worst case for LRU and FIFO when L > frames | n, L |
-| `refs-zipf` | Zipf-distributed page popularity | n, P, s |
-| `refs-belady` | Known anomaly strings plus a seeded random search | n, P, budget |
 
-Provenance rules: generator output is written to disk and that file is the artifact, so benchmarks never regenerate on the fly. Headers record generator name, version, seed and parameters, and every result row records the file's sha256. Generators draw from their own `ms_rng` seeded from the header's seed; the engine never draws random numbers except through a seeded Random policy.
+These two generators are the week's scope; the others the earlier plan listed are cut. Provenance rules: generator output is written to disk and that file is the artifact, so benchmarks never regenerate on the fly. Headers record generator name, version, seed and parameters, and every result row records the file's sha256. Generators draw from their own `ms_rng` seeded from the header's seed; the engine never draws random numbers except through a seeded Random policy.
 
 ## 13. Metrics and benchmarking
 
@@ -940,7 +1007,9 @@ One `MetricsCollector` (P7) computes every reported number from events, and one 
 \text{EAT} = (1 - p)\, t_{\text{mem}} + p\, t_{\text{fault}} + \frac{\text{write\_backs}}{\text{references}}\, t_{\text{wb}}, \qquad p = \text{fault\_rate}
 ```
 
-A benchmark spec is a committed JSON file, read with the same parser as workloads (ADR-012); the runner expands it into runs:
+*This week the benchmark runner and JSON specs below are cut: `scripts/experiments/e1.sh` and `e4.sh` loop `memsim run --no-trace --json` over policies, sizes and seeds and append one CSV row per run. The metric definitions above are unchanged. The design below is kept for after the deadline.*
+
+A benchmark spec is a committed JSON file; the runner expands it into runs:
 
 ```json
 {
@@ -1045,18 +1114,18 @@ Test ids follow layer, subsystem and number: U-C-010 is a contiguous unit test. 
 
 ## 15. Interface
 
-v1's interface is a CLI that covers every requirement; the viewer replays level-2 traces and renders their snapshots, so it can never disagree with the engine. P9 chooses the viewer stack (ADR-004 is Open).
+v1's interface is a CLI that covers every requirement; the viewer replays traces and renders their snapshots, so it can never disagree with the engine. The viewer is option A, built as one static HTML file in plain JavaScript (ADR-004, decided for the one-week plan).
 
 | Command | Purpose | Example |
 | --- | --- | --- |
-| `validate` | Check a workload file | `memsim validate w.jsonl` |
-| `run` | One workload, one policy | `memsim run w.jsonl --policy best-fit --trace t.jsonl --level 2` |
-| `compare` | One workload, several policies, metrics side by side | `memsim compare w.jsonl --policies first-fit,best-fit,worst-fit` |
+| `validate` (SHOULD) | Check a workload file | `memsim validate w.txt` |
+| `run` | One workload, one policy | `memsim run w.txt --policy best-fit --trace t.jsonl` |
+| `compare` | One workload, several policies, metrics side by side | `memsim compare w.txt --policies first-fit,best-fit,worst-fit` |
 | `refs` | Textbook shortcut: a reference string typed on the command line | `memsim refs "7 0 1 2 0 3 0 4" --frames 3 --policy lru --table` |
-| `sweep` | Faults against frame count, Belady points flagged | `memsim sweep refs.jsonl --policy fifo --frames 1..8` |
-| `bench` | Run a benchmark spec | `memsim bench benchmarks/specs/e1.json --jobs 8` |
-| `gen` | Generate a workload | `memsim gen refs-locality --seed 7 -o w.jsonl` |
-| `replay` | Step through a trace in the terminal | `memsim replay t.jsonl` |
+| `sweep` | Faults against frame count, Belady points flagged | `memsim sweep refs.txt --policy fifo --frames 1..8` |
+| `bench` (cut this week) | Run a benchmark spec | Replaced by `scripts/experiments/*.sh` |
+| `gen` | Generate a workload | `memsim gen refs-locality --seed 7 -o w.txt` |
+| `replay` (cut this week) | Step through a trace in the terminal | The viewer covers this |
 
 Global flags: `--set key=value` overrides header config, `--check` and `--no-check` toggle invariants (on by default), and `--json` prints machine-readable output. Exit codes: 0 for success (failed allocations are normal results), 2 for invalid input, 3 for a contract violation or internal error. `refs --table` prints the classic frames × references grid with faults marked, the layout OS courses use, so anyone can check homework against it.
 
@@ -1146,14 +1215,14 @@ Conventions (Proposed, P10 to refine):
 
 ## 17. Architecture decision log
 
-Thirteen decisions shape the system; one is Accepted, eleven are Proposed and one (the viewer stack) is Open. The kickoff meeting moves each to Accepted or Rejected; anything Accepted later changes only by RFC.
+Thirteen decisions shape the system. For the one-week plan, ADR-001, ADR-004 and ADR-012 are settled; the rest stand as written unless the plan's scope table cuts them. The kickoff meeting moves each to Accepted or Rejected; anything Accepted later changes only by RFC.
 
 | ID | Decision | Status | Alternatives considered | Decides |
 | --- | --- | --- | --- | --- |
 | ADR-001 | C17 with CMake, Ninja, gcc and clang, sanitizers, clang-format and clang-tidy | Accepted (P1, Oct 25, 2026) | Python: fastest to write, with the best plotting and property-testing tools, but further from a real allocator. C++: same speed with RAII and containers, but a larger language for a ten-person team. Java: strong typing, weaker plotting. TypeScript: runs in the browser, weaker analysis stack | P1 |
 | ADR-002 | Contiguous layout: address-ordered linked list, hash indexes by id and pid, size-ordered free index | Proposed | Sorted array; bitmap of units; balanced tree | P2 |
 | ADR-003 | Workloads refer to allocations by logical id, never by address; ids are never reused | Proposed | Address-based frees, which break cross-policy replay and compaction | P1, P7 |
-| ADR-004 | Viewer technology | Open | Static HTML replay, ncurses TUI, local web server (section 15) | P9 |
+| ADR-004 | Viewer: one static HTML file in plain JavaScript, replaying traces | Accepted (one-week plan) | React and Vite; the engine compiled to WebAssembly for live runs; ncurses TUI; a web server in C | P9 |
 | ADR-005 | The event log is the integration contract; metrics, viewer and golden tests consume events | Proposed | Each module computes its own statistics | P1 |
 | ADR-006 | Three-tier error model: input error, domain outcome, contract violation | Proposed | Abort on everything; silent error codes | P1 |
 | ADR-007 | Determinism: integer state, logical clocks, fixed tie-breaks, canonical serialisation, seeded randomness only in generators | Proposed | None viable for golden tests | P1 |
@@ -1161,7 +1230,7 @@ Thirteen decisions shape the system; one is Accepted, eleven are Proposed and on
 | ADR-009 | Half-open ranges and abstract integer units | Proposed | Inclusive ranges; byte-addressed memory | P2 |
 | ADR-010 | Policies decide, engines mutate | Proposed | Policies mutate state directly | P1 |
 | ADR-011 | Full, order-preserving sliding compaction | Proposed | Minimal-move compaction (stretch) | P4 |
-| ADR-012 | JSON through vendored cJSON, for workloads, traces, results and bench specs | Proposed | jsmn (tokeniser only, no writer); a hand-written parser; YAML for specs, which needs a second library | P7, P1 |
+| ADR-012 | JSON through vendored cJSON, for workloads, traces, results and bench specs | Rejected (one-week plan): workloads are plain text and traces are written with `printf`, so nothing parses JSON | jsmn (tokeniser only, no writer); a hand-written parser; YAML for specs, which needs a second library | P7, P1 |
 | ADR-013 | String ids interned to dense integers at load; the engine never sees strings | Proposed | Hash tables keyed by strings inside the engine | P1, P2 |
 
 ADR-001 chose C so the simulator is written in the language of the systems it models, and so the real-arena backend (FR-S1) needs no second language. The cost is memory safety and tooling, paid for by sanitizers on every CI run, Valgrind nightly, invariants checked after every step, and a few vendored libraries. Workloads, traces and results stay files, so the viewer and the plots can use whatever tool suits them.
@@ -1170,70 +1239,35 @@ ADR-003 is the decision most worth defending: different policies place the same 
 
 ## 18. Milestones, critical path and risks
 
-v1.0 ships six weeks after kickoff through six milestones and two gates: contracts are ratified at kickoff, and interfaces freeze after week 3.
+The six-week milestone plan is replaced by the **One-week plan** at the top of this document.
 
-&#91;embedded content: Delivery plan · 6 milestones, 2 gates\]
-
-Each box states its milestone's exit criteria; a milestone is done only when all of them pass in CI on `main`.
-
-The critical path runs contracts (P1) → memory model (P2) → placement and compaction (P3, P4) → experiments E1 and E2 (P7) → report. The paging path (P5 → P6 → E4, E5) runs in parallel and is shorter. P3, P4 and P6 start in week 1 against the frozen interfaces and fakes, while P8 and P9 start against committed sample files.
-
-M0 exit checklist:
-
-- [ ] Every owner has commented on their sections and answered their questions in section 19
-- [x] ADR-001 (language) decided: C
-- [ ] ADR-004 (viewer) decided, ADR statuses updated in section 17
-- [ ] `common/` types and events, `MemoryView`, `FrameView` and both policy vtables merged (P1)
-- [ ] Repo skeleton, CODEOWNERS and CI green on an empty build (P10); CI green on PR #1, CODEOWNERS still has placeholder handles
-- [ ] Sample workload files and a level-2 trace committed for P8 and P9 (P1, P7)
-- [ ] AC-1 to AC-5 golden fixtures written from this spec (P8)
-- [ ] Weeks mapped to calendar dates against the submission deadline (P1)
+The critical path is now: shared headers (P1, Day 1) → contiguous engine and policies (P2, P3, Day 2–3) → AC-1 and AC-2 green (Day 4) → E1 results (P7, Day 5) → report and demo (Day 6). Paging (P5 → P6 → E4) runs in parallel and is the first thing to drop if the week slips.
 
 | Risk, most severe first | Mitigation | Owner |
 | --- | --- | --- |
-| P2 or P5 slips, and the critical path with them | Interfaces and fakes at M0; P3 pairs with P2 and P6 with P5 in week 1 | P1 |
-| Interfaces churn after M2 | RFC process, schema versions, freeze gate after M2 | P1 |
+| The shared headers slip past Day 1 and block everyone | P1 merges them first; owners code against stubs from the header PR before it merges | P1 |
+| P2 or P5 slips, and the critical path with them | P3 pairs with P2 and P6 with P5 from Day 2; paging is dropped first | P1 |
+| Report sections arrive late or uneven | Drafts due end of Day 5, written from each owner's own module; P10 assembles on Day 6 | P10 |
+| The live demo fails on the day | Scripted demo with committed inputs, rehearsed on Days 6 and 7, recorded fallback | P9, P1 |
+| Interfaces churn after Day 2 | Freeze at end of Day 2; later changes need P1 in the PR | P1 |
 | Memory-safety bugs corrupt state and make results wrong without failing | Sanitizers on every CI run, Valgrind nightly, invariants after every step in checked mode | P10, P8 |
 | Hidden non-determinism from uninitialised memory, pointer-order iteration or float accumulation | Integer state, sorted iteration on output, determinism job in CI | P10, P8 |
 | Integration crunch in the last week | Trunk-based development, weekly merges, CI gate on `main` | P10 |
 | Report numbers disagree across sections | One `MetricsCollector`; section 13 definitions are the source of truth | P7 |
-| Viewer scope creep starves correctness work | Replay-only v1; viewer work starts at M3 | P9 |
+| Viewer scope creep starves correctness work | Replay only, one static file; starts against sample traces on Day 3 | P9 |
 | A golden expectation is wrong | P8 re-derives each by hand and the oracles cross-check | P8 |
-| OPT used in a live session | `requires_lookahead` flag; `Session` refuses it | P6 |
 
 ## 19. Open questions per owner
 
-Each owner answers their three questions in a comment before kickoff and ticks them off. An answer that changes this doc becomes an edit; after kickoff, an answer that changes a shared contract becomes an RFC.
+Answer by **end of Day 1 (Mon Oct 26)** in [Discussion #2](https://github.com/CyberKnight-cmd/memforge/discussions/2). Questions about cut features are gone; each owner also writes the report section listed in the One-week plan.
 
-- [x] P1: ADR-001 (language) decided: C.
-- [ ] P1: Put ADR-004 (viewer) to a vote at kickoff and update its status.
-- [ ] P1: Map weeks 1 to 6 onto the submission date; if fewer than six weeks remain, decide which SHOULD items drop first.
-- [ ] P1: Are E6 and FR-S1 (real-arena backend) in scope, or explicitly out?
+- [ ] P1: Merge the shared headers on Day 1; write report sections 1, 2 and 12; build the demo script with P9.
 - [ ] P2: Linked list or sorted array for the block layout (ADR-002)?
-- [ ] P2: Default `alignment` (1 or 8) and `min_split` for the experiments?
-- [ ] P2: Do we need `reserve(start, size)` to pin a fixed region, such as an OS area at address 0?
-- [ ] P3: Is Next-Fit in v1?
-- [ ] P3: Build the O(log h) indexed versions now, or only if E1 runs exceed the NFR-5 budget?
-- [ ] P3: Should high-end placement inside a hole be a config option, or stay low-end only?
-- [ ] P4: Accept ext\_frag = 1 − largest/total as the headline metric, or propose another?
-- [ ] P4: Which compaction trigger is the default for E1, and is minimal-move compaction worth a stretch slot?
-- [ ] P4: Should compaction cost also be expressed in time units for the report?
-- [ ] P5: Support both vpn-level and va-level references in v1?
-- [ ] P5: Local replacement with quotas (FR-P10) and the TLB (FR-S2): in or out?
-- [ ] P5: Confirm R and D are cleared on eviction and D starts at 0 on load.
-- [ ] P6: Clock and LFU in v1?
+- [ ] P3: Anything in the placement rules (section 8) you would change before the Day 2 freeze?
+- [ ] P4: Accept ext\_frag = 1 − largest/total as the headline metric? Report compaction cost in units moved only, or also in time?
+- [ ] P5: Support both vpn-level and va-level references (the format allows both)? Confirm R and D are cleared on eviction and D starts at 0 on load.
 - [ ] P6: OPT through a heap or a plain scan?
-- [ ] P6: Search budget for E5, and what counts as a reportable anomaly?
-- [ ] P7: Final generator list and parameters; are 10 seeds per configuration enough?
-- [ ] P7: Sample time series every step, or every k steps on long runs?
-- [ ] P7: Which plots does the report need, so E1 to E5 export exactly those, and which plotting tool draws them?
-- [ ] P7: Accept cJSON for every JSON file (ADR-012), or propose another library?
-- [ ] P8: Confirm the oracle set and the property-test budgets for CI and nightly runs; keep the in-house harness or adopt a C property-testing library?
-- [ ] P8: Is a 90% engine coverage gate right, and do we add mutation testing?
-- [ ] P8: Re-derive AC-1 to AC-4 by hand and flag any disagreement in a comment.
-- [ ] P9: Pick viewer option A, B or C (ADR-004).
-- [ ] P9: Cap viewer traces at a step count (proposal: 5,000) to bound level-2 file size?
-- [ ] P9: Which comparison views matter most for the demo?
-- [ ] P10: Confirm CMake, Ninja and the warning set; Doxygen for API docs, or plain Markdown?
-- [ ] P10: Branch-protection rules and required checks.
-- [ ] P10: Release checklist contents.
+- [ ] P7: Parameters and seed count for E1 and E4, metric sampling interval, the report's plot list, and the plotting tool.
+- [ ] P8: Re-derive AC-1 to AC-4 by hand and flag any disagreement; which oracles fit in the week (brute-force placement and Mattson stack distances are the cheapest)?
+- [ ] P9: Trace step cap for the viewer (proposal: 5,000); the demo's exact steps.
+- [ ] P10: Report format and template; the determinism CI job; the submission checklist.

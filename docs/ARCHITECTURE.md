@@ -1132,7 +1132,7 @@ Checks run in two places. `pre-commit` runs on every local commit: file hygiene,
 6. Coverage (once engines exist): gcovr applies the engine coverage gate.
 7. Benchmark smoke (once the runner exists): a tiny spec in checked mode.
 
-A final `CI passed` job depends on all the others, and it is the only check that branch protection on `main` requires, so jobs can be added without changing repository settings. Merging into `main` needs a pull request, that check, and a code owner's approval. Dependabot keeps the pinned GitHub Actions current.
+A final `CI passed` job depends on all the others, and it is the only check that branch protection on `main` requires, so jobs can be added without changing repository settings. Merging into `main` needs a pull request, that check, one approval and resolved conversations. Code-owner review is not enforced while ownership is provisional; P1 turns it on once the owner list is final. Dependabot keeps the pinned GitHub Actions current.
 
 Nightly jobs run the deep property budget, large differential runs and libFuzzer on the workload loader; a release tag runs full validation and builds the changelog.
 
@@ -1184,7 +1184,7 @@ M0 exit checklist:
 - [x] ADR-001 (language) decided: C
 - [ ] ADR-004 (viewer) decided, ADR statuses updated in section 17
 - [ ] `common/` types and events, `MemoryView`, `FrameView` and both policy vtables merged (P1)
-- [ ] Repo skeleton, CODEOWNERS and CI green on an empty build (P10); skeleton committed, CI not yet run on GitHub
+- [ ] Repo skeleton, CODEOWNERS and CI green on an empty build (P10); CI green on PR #1, CODEOWNERS still has placeholder handles
 - [ ] Sample workload files and a level-2 trace committed for P8 and P9 (P1, P7)
 - [ ] AC-1 to AC-5 golden fixtures written from this spec (P8)
 - [ ] Weeks mapped to calendar dates against the submission deadline (P1)

@@ -1,4 +1,6 @@
-# Mirrors README section 5. The last matching rule wins; replace @pN with GitHub handles.
+# Mirrors docs/ARCHITECTURE.md section 5. The last matching rule wins; replace @pN with GitHub handles.
+# Advisory for now: branch protection does not require code-owner review while ownership is
+# provisional. Reassigning an area is a one-line change here.
 # A module's CMakeLists.txt belongs to its owner; scripts/check_layers.sh in CI guards its DEPS.
 
 /src/common/                         @p1

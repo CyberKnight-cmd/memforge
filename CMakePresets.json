@@ -1,0 +1,27 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "Debug with ASan and UBSan",
+      "generator": "Ninja",
+      "binaryDir": "build/dev",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "MEMSIM_SANITIZE": "ON" }
+    },
+    {
+      "name": "release",
+      "displayName": "Optimised build for benchmarks",
+      "generator": "Ninja",
+      "binaryDir": "build/release",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "dev", "configurePreset": "dev" },
+    { "name": "release", "configurePreset": "release" }
+  ],
+  "testPresets": [
+    { "name": "dev", "configurePreset": "dev", "output": { "outputOnFailure": true } },
+    { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true } }
+  ]
+}

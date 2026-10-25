@@ -1,0 +1,40 @@
+# Mirrors README section 5. The last matching rule wins; replace @pN with GitHub handles.
+# A module's CMakeLists.txt belongs to its owner; scripts/check_layers.sh in CI guards its DEPS.
+
+/src/common/                         @p1
+/src/session/                        @p1
+/src/trace/                          @p1
+
+/src/contiguous/                     @p2
+/src/contiguous/placement.h          @p3
+/src/contiguous/policies/            @p3
+/src/contiguous/fragmentation.*      @p4
+/src/contiguous/compaction.*         @p4
+
+/src/paging/                         @p5
+/src/paging/replacement.h            @p6
+/src/paging/policies/                @p6
+/src/paging/include/memsim/paging/belady.h  @p6
+/src/paging/belady.c                 @p6
+
+/src/workloads/                      @p7
+/src/metrics/                        @p7
+/src/bench/                          @p7
+/benchmarks/                         @p7
+
+/tests/                              @p8
+/tests/unit/common/                  @p1
+/tests/unit/contiguous/              @p2
+/tests/unit/paging/                  @p5
+
+/src/cli/                            @p9
+/viewer/                             @p9
+
+/.github/                            @p10
+/docs/                               @p10
+/scripts/                            @p10
+/third_party/                        @p10 @p1
+/cmake/                              @p10 @p1
+/CMakeLists.txt                      @p10 @p1
+/CMakePresets.json                   @p10 @p1
+/src/CMakeLists.txt                  @p1

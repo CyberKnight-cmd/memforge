@@ -82,7 +82,8 @@ compiler, and `scripts/check_layers.sh` covers what the compiler can't.
 
 ## Team
 
-Ten owners, one per area; [CODEOWNERS](.github/CODEOWNERS) routes reviews accordingly.
+Ten owners, one per area, recorded in [CODEOWNERS](.github/CODEOWNERS). Ownership is provisional until
+the team settles, so GitHub does not yet require the owner's review; ask the owner to review anyway.
 
 | Role | Area |
 | --- | --- |
@@ -102,7 +103,7 @@ Ten owners, one per area; [CODEOWNERS](.github/CODEOWNERS) routes reviews accord
 - Branch from `main` as `feat/<module>-<topic>` and keep branches short-lived; `main` stays green.
 - Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:` and so
   on).
-- Each pull request needs its module owner's approval. Changes to `src/common/`, a shared header, an
+- Each pull request needs one approval, ideally from the module's owner. Changes to `src/common/`, a shared header, an
   event or a file format also need P1, and an RFC issue once kickoff has ratified the contracts.
 - Follow [the conventions](docs/CONVENTIONS.md).
 - Every pull request runs CI. Merging needs the single **CI passed** check, which waits for all of

@@ -13,8 +13,10 @@ Every run is reproducible: the same workload, configuration and seed always give
 trace, so policies can be compared fairly and every number in the report traces back to a test or a
 benchmark row.
 
-> **Status:** pre-0.1, milestone M0 (contracts). The repository skeleton builds and its test passes;
-> the engines are not implemented yet. See [the architecture](docs/ARCHITECTURE.md) for the plan.
+> **Status:** one-week build, due **Sunday, November 1, 2026** with a 30-page report and a live demo.
+> The skeleton builds and CI is green; the engines land this week. The
+> [one-week plan](docs/ARCHITECTURE.md#one-week-plan) has the scope, the day-by-day schedule and
+> who writes which report section.
 
 ## Quick start
 
@@ -44,13 +46,13 @@ exactly what CI will reject.
 Once the engines land, the CLI covers the textbook exercises directly:
 
 ```sh
-memsim compare workload.jsonl --policies first-fit,best-fit,worst-fit
+memsim compare workload.txt --policies first-fit,best-fit,worst-fit
 memsim refs "7 0 1 2 0 3 0 4 2 3 0 3 2 1 2 0 1 7 0 1" --frames 3 --policy lru --table
-memsim sweep refs.jsonl --policy fifo --frames 1..8
+memsim sweep refs.txt --policy fifo --frames 1..8
 ```
 
-Workloads, traces and benchmark results are versioned JSONL files, described in sections 11 to 13
-of the architecture.
+Workloads are plain-text files, traces are JSONL and experiment results are CSV, described in
+sections 11 to 13 of the architecture.
 
 ## Repository layout
 

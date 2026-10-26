@@ -5,7 +5,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include "memsim/paging/replacement.h"
+
 
 typedef struct ms_page_policy_vtable {
     ms_page_policy id;

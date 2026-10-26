@@ -2,7 +2,7 @@
 #ifndef MEMSIM_PAGING_REPLACEMENT_PRIVATE_H_
 #define MEMSIM_PAGING_REPLACEMENT_PRIVATE_H_
 
-#include "memsim/paging/replacement.h"
+
 
 typedef struct ms_page_policy_vtable {
     ms_page_policy id;

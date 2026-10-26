@@ -1,8 +1,11 @@
+```c
 /* Replacement policy vtable (private). Owner: P6. */
 #ifndef MEMSIM_PAGING_REPLACEMENT_PRIVATE_H_
 #define MEMSIM_PAGING_REPLACEMENT_PRIVATE_H_
 
-
+#include <stddef.h>
+#include <stdint.h>
+#include "memsim/paging/replacement.h"
 
 typedef struct ms_page_policy_vtable {
     ms_page_policy id;
@@ -18,3 +21,4 @@ const ms_page_policy_vtable *ms_page_lru_vtable(void);
 const ms_page_policy_vtable *ms_page_opt_vtable(void);
 
 #endif /* MEMSIM_PAGING_REPLACEMENT_PRIVATE_H_ */
+```

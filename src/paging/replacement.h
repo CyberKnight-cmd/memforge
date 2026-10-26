@@ -1,4 +1,4 @@
-```c
+
 /* Replacement policy vtable (private). Owner: P6. */
 #ifndef MEMSIM_PAGING_REPLACEMENT_PRIVATE_H_
 #define MEMSIM_PAGING_REPLACEMENT_PRIVATE_H_

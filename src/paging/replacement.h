@@ -21,4 +21,4 @@ const ms_page_policy_vtable *ms_page_lru_vtable(void);
 const ms_page_policy_vtable *ms_page_opt_vtable(void);
 
 #endif /* MEMSIM_PAGING_REPLACEMENT_PRIVATE_H_ */
-```
+

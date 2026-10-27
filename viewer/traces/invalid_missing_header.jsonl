@@ -1,0 +1,2 @@
+{"seq":0,"step":0,"type":"Snapshot","step":0,"contiguous":{"memory_size":1000,"blocks":[{"start":0,"size":1000,"state":"free"}],"frag":{"total_free":1000,"largest_hole":1000,"hole_count":1,"ext_frag":0.0}}}
+{"seq":1,"step":1,"type":"BlockAllocated","data":{"pid":"P1","id":"a1","start":0,"size":100,"requested":100}}

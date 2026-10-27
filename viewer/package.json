@@ -1,0 +1,12 @@
+{
+  "name": "memforge-trace-viewer",
+  "version": "0.1.0",
+  "description": "MemForge P9 Trace Viewer / Visualization Dashboard",
+  "scripts": {
+    "test": "node ../tests/unit/viewer/test_viewer.js && node ../tests/unit/viewer/test_metrics_calculation.js",
+    "build": "node build.js"
+  },
+  "keywords": ["memforge", "memory-simulator", "trace-viewer", "paging", "contiguous-allocation"],
+  "author": "P9 Team",
+  "license": "MIT"
+}

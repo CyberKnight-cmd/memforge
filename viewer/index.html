@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MemForge P9 Trace Viewer — High-performance interactive visualization and replay dashboard for OS memory management and paging simulation traces.">
+  <title>MemForge — Trace Viewer Interface (P9)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top Application Header -->
+  <header class="app-header" role="banner">
+    <div class="header-container">
+      <div class="brand-section">
+        <h1 class="brand-logo">
+          <span>⚡ MemForge</span>
+        </h1>
+        <span class="brand-badge">P9 Trace Viewer</span>
+      </div>
+
+      <div class="trace-meta-pills" id="trace-meta-pills" aria-label="Trace Metadata">
+        <span class="meta-pill" id="meta-workload">Workload: <strong>—</strong></span>
+        <span class="meta-pill" id="meta-policy">Policy: <strong>—</strong></span>
+        <span class="meta-pill subsystem-contiguous" id="meta-subsystem">Mode: <strong>CONTIGUOUS</strong></span>
+        <span class="meta-pill" id="meta-config">Config: <strong>—</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Notification Banner Container -->
+  <div id="notification-container" style="max-width:1440px;width:100%;margin:1rem auto 0;padding:0 1.5rem;" role="alert" aria-live="polite"></div>
+
+  <!-- Main Viewport -->
+  <main class="app-main" role="main">
+
+    <!-- Trace Loading Section -->
+    <section class="loader-panel" aria-label="Trace Loading Controls">
+      <div class="loader-row">
+        <div class="file-input-wrapper" id="trace-dropzone">
+          <input type="file" id="trace-file-input" class="file-input-hidden" accept=".jsonl,.trace,.json,.txt" aria-label="Select Trace File">
+          <button type="button" class="btn btn-primary" id="btn-load-file">
+            📁 Open Trace File
+          </button>
+          <span style="font-size:0.8rem;color:var(--text-muted);">or drag & drop a .jsonl trace here</span>
+        </div>
+
+        <div class="sample-traces-group">
+          <span class="sample-label">Quick Samples:</span>
+          <button type="button" class="btn btn-pill" id="btn-sample-ac1" title="AC-1 First-Fit fragmentation failure on Silberschatz 5 holes">AC-1 First-Fit</button>
+          <button type="button" class="btn btn-pill" id="btn-sample-ac2" title="AC-2 Sliding compaction and retry of 426 allocation">AC-2 Compaction</button>
+          <button type="button" class="btn btn-pill" id="btn-sample-ac3" title="AC-3 Paging reference string with 3 frames and FIFO replacement">AC-3 Paging FIFO</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Playback Control Toolbar -->
+    <section class="playback-bar" aria-label="Trace Playback Controls">
+      <div class="playback-controls-row">
+        <div class="step-counter-box">
+          <span class="step-label">Step</span>
+          <span class="step-display" id="step-display">0</span>
+          <span class="step-total" id="step-total">/ 0</span>
+        </div>
+
+        <div class="transport-buttons">
+          <button type="button" class="btn btn-icon" id="btn-reset" title="Reset to start (Home or r)" aria-label="Reset to start">⏮</button>
+          <button type="button" class="btn btn-icon" id="btn-prev" title="Previous step (Left Arrow or k)" aria-label="Previous step">◀</button>
+          <button type="button" class="btn btn-play-pause" id="btn-play" title="Play / Pause (Space)" aria-label="Play or Pause">▶</button>
+          <button type="button" class="btn btn-icon" id="btn-next" title="Next step (Right Arrow or j)" aria-label="Next step">▶</button>
+          <button type="button" class="btn btn-accent" id="btn-failure" title="Jump to next allocation failure or page fault (f)" style="margin-left:0.5rem;font-size:0.75rem;">
+            ⚠ Next Fault
+          </button>
+        </div>
+
+        <div class="playback-options">
+          <div class="speed-control">
+            <label for="playback-speed">Speed:</label>
+            <select id="playback-speed" class="select-dropdown">
+              <option value="1000">0.5x (1000ms)</option>
+              <option value="500" selected>1.0x (500ms)</option>
+              <option value="250">2.0x (250ms)</option>
+              <option value="100">5.0x (100ms)</option>
+              <option value="50">10.0x (50ms)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="scrubber-container">
+        <input type="range" id="scrub-slider" class="scrub-slider" min="0" max="0" value="0" aria-label="Trace Step Scrubber">
+      </div>
+    </section>
+
+    <!-- Empty State -->
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">📊</div>
+      <div class="empty-title">No Trace Loaded</div>
+      <p class="empty-desc">
+        Load a MemForge simulator trace file (<code>.jsonl</code>) or choose one of the quick samples above to begin replaying memory allocation and paging events.
+      </p>
+    </div>
+
+    <!-- Main Dashboard Grid -->
+    <div class="dashboard-grid" id="dashboard-grid" style="display:none;">
+
+      <!-- Primary Visualization (Memory Map or Frame Grid) -->
+      <section class="viz-panel" aria-label="Memory Subsystem Visualization">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>Memory Layout</span>
+          </div>
+          <div class="panel-subtitle" id="viz-subtitle">Snapshot State</div>
+        </div>
+
+        <!-- Address Ruler -->
+        <div class="ruler-container" id="ruler-container" aria-hidden="true"></div>
+
+        <!-- Memory Map / Frame Table Viewport -->
+        <div class="memory-map-container" id="viz-container"></div>
+
+        <!-- Selected Block Inspector -->
+        <div class="inspector-card" id="inspector-container">
+          <div class="inspector-header">Selected Block</div>
+          <div style="color:var(--text-muted);font-size:0.8rem;">Click on any block in the memory map to inspect its details.</div>
+        </div>
+      </section>
+
+      <!-- Sidebar: Metrics & Event History -->
+      <aside class="sidebar-column" aria-label="Metrics and Event History">
+        
+        <!-- Live Metrics Panel -->
+        <section class="viz-panel" style="padding:1.25rem;" aria-label="Memory Metrics">
+          <div class="panel-header" style="margin-bottom:0.75rem;">
+            <div class="panel-title" style="font-size:0.95rem;">Metrics</div>
+          </div>
+          <div id="metrics-container" style="display:flex;flex-direction:column;gap:1rem;"></div>
+        </section>
+
+        <!-- Event Details Panel -->
+        <section class="events-panel" aria-label="Event Details">
+          <div class="panel-header" style="margin-bottom:0.5rem;">
+            <div class="panel-title" style="font-size:0.95rem;">Step Events & Reasoning</div>
+          </div>
+          <div id="events-container"></div>
+        </section>
+
+      </aside>
+
+    </div>
+
+  </main>
+
+  <!-- Application Footer & Keyboard Shortcuts -->
+  <footer class="app-footer" role="contentinfo">
+    <div class="footer-container">
+      <div>MemForge Simulation Engine · Module P9 Interface</div>
+      <div class="shortcuts-legend">
+        <div class="shortcut-item"><kbd>Space</kbd> Play/Pause</div>
+        <div class="shortcut-item"><kbd>←</kbd> / <kbd>→</kbd> Step</div>
+        <div class="shortcut-item"><kbd>Home</kbd> / <kbd>r</kbd> Reset</div>
+        <div class="shortcut-item"><kbd>f</kbd> Jump to Fault</div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

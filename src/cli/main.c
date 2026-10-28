@@ -20,6 +20,22 @@
 #define MEMSIM_GIT "unknown"
 #endif
 
+/* Traces name the workload by file stem, not path, so they do not depend on where it ran. */
+static const char *workload_name(const char *path, char *buf, size_t cap) {
+    const char *base = strrchr(path, '/');
+    base = base != NULL ? base + 1 : path;
+    size_t n = strlen(base);
+    if (n > 3 && strcmp(base + n - 3, ".wl") == 0) {
+        n -= 3;
+    }
+    if (n >= cap) {
+        n = cap - 1;
+    }
+    memcpy(buf, base, n);
+    buf[n] = '\0';
+    return buf;
+}
+
 static void print_usage(FILE *out) {
     (void)fprintf(out, "Usage: memsim <command> [options]\n\n"
                        "Commands:\n"
@@ -144,9 +160,10 @@ static int cmd_run(int argc, char **argv) {
         }
     }
 
+    char name_buf[128];
     ms_bench_opts opts = {
         .trace = trace_file,
-        .workload_name = workload_path,
+        .workload_name = workload_name(workload_path, name_buf, sizeof name_buf),
         .workload_sha256 = sha256_hex,
         .git = MEMSIM_GIT,
         .check = check,
@@ -396,10 +413,11 @@ static void print_compare_metrics_table(char **policies, size_t n_policies,
 static ms_status run_compare_benchmarks(const ms_workload *w, const char *workload_path,
                                         const char *sha256_hex, char *const *policies,
                                         size_t n_policies, ms_bench_result *results) {
+    char name_buf[128];
     for (size_t p = 0; p < n_policies; p++) {
         ms_bench_opts opts = {
             .trace = NULL,
-            .workload_name = workload_path,
+            .workload_name = workload_name(workload_path, name_buf, sizeof name_buf),
             .workload_sha256 = sha256_hex,
             .git = MEMSIM_GIT,
             .check = true,

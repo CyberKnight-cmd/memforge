@@ -18,7 +18,8 @@ CSV_FILE="$RESULTS_DIR/e1.csv"
 
 mkdir -p "$WORKLOADS_DIR"
 
-echo "target,seed,policy,alloc_requests,alloc_failures,failures_fragmentation,failures_capacity,success_rate,scanned_mean,ext_frag_mean" > "$CSV_FILE"
+GIT_SHA="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+echo "target,seed,policy,alloc_requests,alloc_failures,failures_fragmentation,failures_capacity,success_rate,scanned_mean,ext_frag_mean,workload_sha256,git_sha" > "$CSV_FILE"
 
 TARGETS=("low" "medium" "high")
 
@@ -81,7 +82,7 @@ for i, pol in enumerate(policies):
     succ = (1.0 - (fail / req)) if req > 0 else 1.0
     scanned = float(get_metric("scanned_mean", i, pol))
     ext_frag = float(get_metric("ext_frag_mean", i, pol))
-    print(f"{target},{seed},{pol},{req},{fail},{frag_fail},{cap_fail},{succ:.6f},{scanned:.6f},{ext_frag:.6f}")
-' "$target" "$seed" <<< "$json_output" >> "$CSV_FILE"
+    print(f"{target},{seed},{pol},{req},{fail},{frag_fail},{cap_fail},{succ:.6f},{scanned:.6f},{ext_frag:.6f},{sys.argv[3]},{sys.argv[4]}")
+' "$target" "$seed" "$(sha256sum "$wl_file" | cut -d" " -f1)" "$GIT_SHA" <<< "$json_output" >> "$CSV_FILE"
     done
 done

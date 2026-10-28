@@ -17,6 +17,7 @@ import csv
 import os
 import sys
 
+from stats import summary  # noqa: E402  (analysis/ is on sys.path when run as a script)
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -104,7 +105,12 @@ def plot_e4(e4_csv, ac4_csv, output_dir):
             continue
         cfg = POLICY_CONFIG[pol]
         frames_sorted = sorted(data[pol].keys())
-        mean_faults = [float(np.mean(data[pol][f])) for f in frames_sorted]
+        stats = [summary([float(v) for v in data[pol][f]]) for f in frames_sorted]
+        mean_faults = [s[1] for s in stats]
+        ci = [s[3] for s in stats]
+        # 95% confidence band of the mean over seeds (FR-W4).
+        ax1.fill_between(frames_sorted, [m - c for m, c in zip(mean_faults, ci)], [m + c for m, c in zip(mean_faults, ci)],
+                         color=cfg["color"], alpha=0.15, linewidth=0, zorder=2)
 
         ax1.plot(
             frames_sorted,

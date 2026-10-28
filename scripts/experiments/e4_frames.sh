@@ -19,7 +19,8 @@ AC4_CSV_FILE="$RESULTS_DIR/belady_ac4.csv"
 
 mkdir -p "$WORKLOADS_DIR"
 
-echo "seed,policy,frames,faults,belady_point" > "$CSV_FILE"
+GIT_SHA="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+echo "seed,policy,frames,faults,belady_point,workload_sha256,git_sha" > "$CSV_FILE"
 
 POLICIES=("fifo" "lru" "opt")
 
@@ -62,8 +63,8 @@ bp_set = set(data.get("belady_points", []))
 for i, frame in enumerate(frames):
     fault = faults[i] if i < len(faults) else 0
     is_bp = 1 if (frame in bp_set) else 0
-    print(f"{seed},{pol},{frame},{fault},{is_bp}")
-' "$seed" <<< "$json_output" >> "$CSV_FILE"
+    print(f"{seed},{pol},{frame},{fault},{is_bp},{sys.argv[2]},{sys.argv[3]}")
+' "$seed" "$(sha256sum "$wl_file" | cut -d" " -f1)" "$GIT_SHA" <<< "$json_output" >> "$CSV_FILE"
     done
 done
 

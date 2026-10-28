@@ -11,6 +11,7 @@ repos:
       - id: check-merge-conflict
       - id: check-yaml
       - id: check-json
+        exclude: ^web/tsconfig.*\.json$  # TypeScript configs are JSONC (comments allowed)
       - id: check-added-large-files
 
   - repo: https://github.com/pre-commit/mirrors-clang-format

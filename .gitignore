@@ -5,3 +5,6 @@ compile_commands.json
 *.o
 *.a
 *.trace.jsonl
+web/node_modules/
+web/dist/
+web/public/memsim.wasm

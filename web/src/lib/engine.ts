@@ -10,6 +10,8 @@ type Exports = {
   memsim_alloc: (n: number) => number;
   memsim_free: (p: number) => void;
   memsim_run: (text: number, len: number, policy: number) => number;
+  memsim_gen_alloc_uniform: (seed: bigint, ops: number, mem: bigint, min: bigint, max: bigint, pAlloc: number, util: number) => number;
+  memsim_gen_refs_locality: (seed: bigint, n: number, pages: number, ws: number, shift: number, pOut: number, pWrite: number, frames: number, pageSize: number) => number;
 };
 
 let exportsPromise: Promise<Exports> | null = null;
@@ -67,6 +69,28 @@ function putString(ex: Exports, s: string): [number, number] {
   return [p, bytes.length];
 }
 
+function takeString(ex: Exports, p: number): string {
+  const heap = new Uint8Array(ex.memory.buffer);
+  let end = p;
+  while (heap[end] !== 0) end++;
+  const s = dec.decode(heap.subarray(p, end));
+  ex.memsim_free(p);
+  return s;
+}
+
+// The section 12 generators, exactly as `memsim gen` runs them. Probabilities are in parts per million.
+export type AllocUniform = { seed: number; ops: number; memorySize: number; sizeMin: number; sizeMax: number; pAllocPpm: number; targetUtilPpm: number };
+export type RefsLocality = { seed: number; n: number; pages: number; workingSet: number; shiftEvery: number; pOutPpm: number; pWritePpm: number; frames: number; pageSize: number };
+
+export function genAllocUniform(ex: Exports, p: AllocUniform): string | null {
+  const r = ex.memsim_gen_alloc_uniform(BigInt(p.seed), p.ops, BigInt(p.memorySize), BigInt(p.sizeMin), BigInt(p.sizeMax), p.pAllocPpm, p.targetUtilPpm);
+  return r ? takeString(ex, r) : null;
+}
+export function genRefsLocality(ex: Exports, p: RefsLocality): string | null {
+  const r = ex.memsim_gen_refs_locality(BigInt(p.seed), p.n, p.pages, p.workingSet, p.shiftEvery, p.pOutPpm, p.pWritePpm, p.frames, p.pageSize);
+  return r ? takeString(ex, r) : null;
+}
+
 export function runSync(ex: Exports, workload: string, policy: string): RunResult {
   const [tp, tl] = putString(ex, workload);
   const [pp] = putString(ex, policy);
@@ -74,11 +98,7 @@ export function runSync(ex: Exports, workload: string, policy: string): RunResul
   ex.memsim_free(tp);
   ex.memsim_free(pp);
   if (rp === 0) return { ok: false, line: 0, message: 'out of memory' };
-  const heap = new Uint8Array(ex.memory.buffer);
-  let end = rp;
-  while (heap[end] !== 0) end++;
-  const text = dec.decode(heap.subarray(rp, end));
-  ex.memsim_free(rp);
+  const text = takeString(ex, rp);
   if (text.startsWith('!')) {
     const colon = text.indexOf(':');
     return { ok: false, line: Number(text.slice(1, colon)), message: text.slice(colon + 1) };

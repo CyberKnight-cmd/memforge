@@ -1,5 +1,5 @@
 // Turns user actions into workload text for the real engine, and the engine's trace into steps.
-import { loadEngine, runSync, type TraceLine } from './engine';
+import { loadEngine, runSync, genAllocUniform, genRefsLocality, type TraceLine, type AllocUniform, type RefsLocality } from './engine';
 
 export type Block = {
   start: number;
@@ -107,6 +107,30 @@ export function toSteps(lines: TraceLine[]): Run {
     } else pending.push(l);
   }
   return { ok: true, steps, summary };
+}
+
+// Generated workloads, parsed back into lab state. The text is exactly what `memsim gen` writes.
+export async function generateContiguous(p: AllocUniform): Promise<{ memory: number; ops: ContOp[] } | null> {
+  const text = genAllocUniform(await engine(), p);
+  if (text === null) return null;
+  const ops: ContOp[] = [];
+  for (const line of text.split('\n')) {
+    const t = line.split('#')[0].trim().split(/\s+/);
+    if (t[0] === 'alloc') ops.push({ kind: 'alloc', pid: t[1], id: t[2], size: Number(t[3]) });
+    else if (t[0] === 'free') ops.push({ kind: 'free', pid: t[1], id: t[2] });
+  }
+  return { memory: p.memorySize, ops };
+}
+
+export async function generateReferences(p: RefsLocality): Promise<string | null> {
+  const text = genRefsLocality(await engine(), p);
+  if (text === null) return null;
+  return text
+    .split('\n')
+    .map((l) => l.split('#')[0].trim().split(/\s+/))
+    .filter((t) => t[0] === 'access')
+    .map((t) => `${t[2]}${t[3] === 'w' ? 'w' : ''}`)
+    .join(' ');
 }
 
 export async function run(text: string, policy: string): Promise<Run> {

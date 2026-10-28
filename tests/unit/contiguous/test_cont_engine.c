@@ -219,6 +219,212 @@ static void test_random_ops_keep_invariants(void) {
     }
 }
 
+static void test_events_ac1_first_fit_failure(void) {
+    ms_cont_engine *e = silberschatz("first-fit");
+    alloc(e, P1, 21, 212);
+    alloc(e, P2, 22, 417);
+    alloc(e, P3, 23, 112);
+    ms_cont_result r = alloc(e, P4, 24, 426);
+    CHECK_EQ_INT(r.outcome, MS_CONT_FAILED_FRAGMENTATION);
+
+    size_t count = 0;
+    const ms_event *ev = ms_cont_engine_events(e, &count);
+    CHECK_EQ_INT(count, 2);
+
+    CHECK_EQ_INT(ev[0].type, MS_EV_PLACEMENT_DECIDED);
+    CHECK(strcmp(ev[0].data.placement_decided.policy, "first-fit") == 0);
+    CHECK_EQ_INT(ev[0].data.placement_decided.requested, 426);
+    CHECK_EQ_INT(ev[0].data.placement_decided.granted, 426);
+    CHECK_EQ_INT(ev[0].data.placement_decided.found, false);
+    CHECK_EQ_INT(ev[0].data.placement_decided.hole.start, 0);
+    CHECK_EQ_INT(ev[0].data.placement_decided.hole.size, 0);
+    CHECK_EQ_INT(ev[0].data.placement_decided.scanned, 5);
+
+    CHECK_EQ_INT(ev[1].type, MS_EV_ALLOCATION_FAILED);
+    CHECK_EQ_INT(ev[1].data.allocation_failed.pid, P4);
+    CHECK_EQ_INT(ev[1].data.allocation_failed.id, 24);
+    CHECK_EQ_INT(ev[1].data.allocation_failed.requested, 426);
+    CHECK_EQ_INT(ev[1].data.allocation_failed.granted, 426);
+    CHECK_EQ_INT(ev[1].data.allocation_failed.cause, MS_ALLOC_FAIL_FRAGMENTATION);
+    CHECK_EQ_INT(ev[1].data.allocation_failed.total_free, 959);
+    CHECK_EQ_INT(ev[1].data.allocation_failed.largest_hole, 300);
+
+    ms_cont_engine_destroy(e);
+}
+
+static void test_events_ac2_compact(void) {
+    ms_cont_engine *e = silberschatz("first-fit");
+    alloc(e, P1, 21, 212);
+    alloc(e, P2, 22, 417);
+    alloc(e, P3, 23, 112);
+    alloc(e, P4, 24, 426);
+
+    ms_cont_result c = ms_cont_engine_compact(e);
+    CHECK_EQ_INT(c.blocks_moved, 7);
+    CHECK_EQ_INT(c.units_moved, 781);
+
+    size_t count = 0;
+    const ms_event *ev = ms_cont_engine_events(e, &count);
+    CHECK_EQ_INT(count, 9);
+
+    CHECK_EQ_INT(ev[0].type, MS_EV_COMPACTION_STARTED);
+    CHECK(strcmp(ev[0].data.compaction_started.trigger, "explicit") == 0);
+
+    for (size_t i = 1; i <= 7; i++) {
+        CHECK_EQ_INT(ev[i].type, MS_EV_BLOCK_RELOCATED);
+        CHECK_EQ_INT(ev[i].seq, 0);
+        CHECK_EQ_INT(ev[i].step, 0);
+    }
+
+    CHECK_EQ_INT(ev[8].type, MS_EV_COMPACTION_COMPLETED);
+    CHECK_EQ_INT(ev[8].data.compaction_completed.blocks_moved, 7);
+    CHECK_EQ_INT(ev[8].data.compaction_completed.units_moved, 781);
+    CHECK_EQ_INT(ev[8].data.compaction_completed.holes_after, 1);
+
+    ms_cont_engine_destroy(e);
+}
+
+static void test_events_free_coalesce_both_sides(void) {
+    ms_cont_engine *e = ms_cont_engine_create(30, "first-fit");
+    alloc(e, P1, 1, 10);
+    alloc(e, P1, 2, 10);
+    alloc(e, P1, 3, 10);
+    release(e, P1, 1);
+    release(e, P1, 3);
+
+    ms_cont_result r = release(e, P1, 2);
+    CHECK_EQ_INT(r.outcome, MS_CONT_OK);
+
+    size_t count = 0;
+    const ms_event *ev = ms_cont_engine_events(e, &count);
+    CHECK_EQ_INT(count, 2);
+
+    CHECK_EQ_INT(ev[0].type, MS_EV_BLOCK_FREED);
+    CHECK_EQ_INT(ev[0].data.block_freed.pid, P1);
+    CHECK_EQ_INT(ev[0].data.block_freed.id, 2);
+    CHECK_EQ_INT(ev[0].data.block_freed.start, 10);
+    CHECK_EQ_INT(ev[0].data.block_freed.size, 10);
+
+    CHECK_EQ_INT(ev[1].type, MS_EV_BLOCKS_COALESCED);
+    CHECK_EQ_INT(ev[1].data.blocks_coalesced.n_merged, 3);
+    CHECK_EQ_INT(ev[1].data.blocks_coalesced.merged[0].start, 0);
+    CHECK_EQ_INT(ev[1].data.blocks_coalesced.merged[0].size, 10);
+    CHECK_EQ_INT(ev[1].data.blocks_coalesced.merged[1].start, 10);
+    CHECK_EQ_INT(ev[1].data.blocks_coalesced.merged[1].size, 10);
+    CHECK_EQ_INT(ev[1].data.blocks_coalesced.merged[2].start, 20);
+    CHECK_EQ_INT(ev[1].data.blocks_coalesced.merged[2].size, 10);
+    CHECK_EQ_INT(ev[1].data.blocks_coalesced.result.start, 0);
+    CHECK_EQ_INT(ev[1].data.blocks_coalesced.result.size, 30);
+
+    ms_cont_engine_destroy(e);
+}
+
+static void test_events_rejections(void) {
+    ms_cont_engine *e = ms_cont_engine_create(100, "first-fit");
+    size_t count = 0;
+    const ms_event *ev;
+
+    /* INVALID_SIZE (size <= 0) */
+    alloc(e, P1, 1, 0);
+    ev = ms_cont_engine_events(e, &count);
+    CHECK_EQ_INT(count, 1);
+    CHECK_EQ_INT(ev[0].type, MS_EV_ALLOC_REJECTED);
+    CHECK_EQ_INT(ev[0].data.alloc_rejected.pid, P1);
+    CHECK_EQ_INT(ev[0].data.alloc_rejected.id, 1);
+    CHECK_EQ_INT(ev[0].data.alloc_rejected.reason, MS_REJECT_INVALID_SIZE);
+
+    alloc(e, P1, 1, -10);
+    ev = ms_cont_engine_events(e, &count);
+    CHECK_EQ_INT(count, 1);
+    CHECK_EQ_INT(ev[0].type, MS_EV_ALLOC_REJECTED);
+    CHECK_EQ_INT(ev[0].data.alloc_rejected.pid, P1);
+    CHECK_EQ_INT(ev[0].data.alloc_rejected.id, 1);
+    CHECK_EQ_INT(ev[0].data.alloc_rejected.reason, MS_REJECT_INVALID_SIZE);
+
+    /* Allocate id 1 and id 2 */
+    alloc(e, P1, 1, 20);
+    alloc(e, P1, 2, 20);
+
+    /* DUPLICATE_ID on live id */
+    alloc(e, P1, 2, 10);
+    ev = ms_cont_engine_events(e, &count);
+    CHECK_EQ_INT(count, 1);
+    CHECK_EQ_INT(ev[0].type, MS_EV_ALLOC_REJECTED);
+    CHECK_EQ_INT(ev[0].data.alloc_rejected.pid, P1);
+    CHECK_EQ_INT(ev[0].data.alloc_rejected.id, 2);
+    CHECK_EQ_INT(ev[0].data.alloc_rejected.reason, MS_REJECT_DUPLICATE_ID);
+
+    /* UNKNOWN_ID */
+    release(e, P1, 99);
+    ev = ms_cont_engine_events(e, &count);
+    CHECK_EQ_INT(count, 1);
+    CHECK_EQ_INT(ev[0].type, MS_EV_FREE_REJECTED);
+    CHECK_EQ_INT(ev[0].data.free_rejected.pid, P1);
+    CHECK_EQ_INT(ev[0].data.free_rejected.id, 99);
+    CHECK_EQ_INT(ev[0].data.free_rejected.reason, MS_REJECT_UNKNOWN_ID);
+
+    /* WRONG_OWNER */
+    release(e, P2, 2);
+    ev = ms_cont_engine_events(e, &count);
+    CHECK_EQ_INT(count, 1);
+    CHECK_EQ_INT(ev[0].type, MS_EV_FREE_REJECTED);
+    CHECK_EQ_INT(ev[0].data.free_rejected.pid, P2);
+    CHECK_EQ_INT(ev[0].data.free_rejected.id, 2);
+    CHECK_EQ_INT(ev[0].data.free_rejected.reason, MS_REJECT_WRONG_OWNER);
+
+    /* DOUBLE_FREE */
+    release(e, P1, 1);
+    release(e, P1, 1);
+    ev = ms_cont_engine_events(e, &count);
+    CHECK_EQ_INT(count, 1);
+    CHECK_EQ_INT(ev[0].type, MS_EV_FREE_REJECTED);
+    CHECK_EQ_INT(ev[0].data.free_rejected.pid, P1);
+    CHECK_EQ_INT(ev[0].data.free_rejected.id, 1);
+    CHECK_EQ_INT(ev[0].data.free_rejected.reason, MS_REJECT_DOUBLE_FREE);
+
+    /* DUPLICATE_ID on freed id */
+    alloc(e, P1, 1, 10);
+    ev = ms_cont_engine_events(e, &count);
+    CHECK_EQ_INT(count, 1);
+    CHECK_EQ_INT(ev[0].type, MS_EV_ALLOC_REJECTED);
+    CHECK_EQ_INT(ev[0].data.alloc_rejected.pid, P1);
+    CHECK_EQ_INT(ev[0].data.alloc_rejected.id, 1);
+    CHECK_EQ_INT(ev[0].data.alloc_rejected.reason, MS_REJECT_DUPLICATE_ID);
+
+    /* Failed id free -> FREE_SKIPPED */
+    alloc(e, P1, 3, 200); /* fails */
+    release(e, P1, 3);
+    ev = ms_cont_engine_events(e, &count);
+    CHECK_EQ_INT(count, 1);
+    CHECK_EQ_INT(ev[0].type, MS_EV_FREE_SKIPPED);
+    CHECK_EQ_INT(ev[0].data.free_skipped.pid, P1);
+    CHECK_EQ_INT(ev[0].data.free_skipped.id, 3);
+
+    ms_cont_engine_destroy(e);
+}
+
+static void test_events_exact_fit_no_split(void) {
+    ms_cont_engine *e = ms_cont_engine_create(100, "best-fit");
+    alloc(e, P1, 1, 60);
+
+    /* Remaining hole is 40. Request 40 exact fit. */
+    alloc(e, P1, 2, 40);
+    size_t count = 0;
+    const ms_event *ev = ms_cont_engine_events(e, &count);
+    CHECK_EQ_INT(count, 2);
+    CHECK_EQ_INT(ev[0].type, MS_EV_PLACEMENT_DECIDED);
+    CHECK_EQ_INT(ev[0].data.placement_decided.found, true);
+    CHECK_EQ_INT(ev[0].data.placement_decided.hole.start, 60);
+    CHECK_EQ_INT(ev[0].data.placement_decided.hole.size, 40);
+    CHECK_EQ_INT(ev[1].type, MS_EV_BLOCK_ALLOCATED);
+    CHECK_EQ_INT(ev[1].data.block_allocated.pid, P1);
+    CHECK_EQ_INT(ev[1].data.block_allocated.id, 2);
+    CHECK_EQ_INT(ev[1].data.block_allocated.start, 60);
+    CHECK_EQ_INT(ev[1].data.block_allocated.size, 40);
+
+    ms_cont_engine_destroy(e);
+}
+
 int main(void) {
     RUN_TEST(test_ac1_first_fit);
     RUN_TEST(test_ac1_best_fit);
@@ -230,5 +436,10 @@ int main(void) {
     RUN_TEST(test_terminate);
     RUN_TEST(test_create_rejects_bad_config);
     RUN_TEST(test_random_ops_keep_invariants);
+    RUN_TEST(test_events_ac1_first_fit_failure);
+    RUN_TEST(test_events_ac2_compact);
+    RUN_TEST(test_events_free_coalesce_both_sides);
+    RUN_TEST(test_events_rejections);
+    RUN_TEST(test_events_exact_fit_no_split);
     TEST_EXIT();
 }

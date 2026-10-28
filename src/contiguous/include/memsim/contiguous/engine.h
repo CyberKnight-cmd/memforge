@@ -1,11 +1,12 @@
 /* ContiguousEngine: the module's exported interface. Owner: P2.
  *
  * The engine is the model's only mutator (README section 7). Every op returns its domain outcome;
- * rejected and failed ops leave the layout unchanged. Events are not emitted yet: the result
- * carries the fields section 11 needs until P1 lands events.h. */
+ * rejected and failed ops leave the layout unchanged. Events are emitted in section 11 format and
+ * queried via ms_cont_engine_events(). */
 #ifndef MEMSIM_CONTIGUOUS_ENGINE_H_
 #define MEMSIM_CONTIGUOUS_ENGINE_H_
 
+#include "memsim/common/events.h"
 #include "memsim/common/types.h"
 
 typedef struct ms_cont_engine ms_cont_engine; /* opaque */
@@ -44,6 +45,10 @@ ms_cont_result ms_cont_engine_compact(ms_cont_engine *e);
 
 /* The layout in address order, valid until the next op. */
 const ms_block *ms_cont_engine_blocks(const ms_cont_engine *e, size_t *count);
+
+/* Events of the most recent op, in emission order; valid until the next op. seq and step are 0; the
+ * session assigns them. */
+const ms_event *ms_cont_engine_events(const ms_cont_engine *e, size_t *count);
 
 /* Checked mode: 0 if invariants I1 to I7 hold, else the first broken one. */
 int ms_cont_engine_check(const ms_cont_engine *e);

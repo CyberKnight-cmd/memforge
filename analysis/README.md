@@ -76,12 +76,12 @@ Generated figures are saved in vector (`.pdf`) and high-resolution raster (`.png
 ### `e1_placement.{pdf,png}`
 - **Research Question**: *Which contiguous placement policy (First-Fit, Best-Fit, or Worst-Fit) achieves the highest allocation success rate and lowest fragmentation-induced failure rate under varying memory pressure?*
 - **Contents**: Two-panel grouped bar chart showing:
-  1. Mean allocation success rate with min-max error bars across 10 random seeds for Low, Medium, and High utilisation targets.
-  2. Mean fragmentation failure rate with min-max error bars across the same conditions.
+  1. Mean allocation success rate with 95% confidence-interval error bars across 10 random seeds for Low, Medium, and High utilisation targets.
+  2. Mean fragmentation failure rate with 95% confidence-interval error bars across the same conditions.
 
 ### `e1_scanned_mean.{pdf,png}`
 - **Research Question**: *What is the search overhead (computational cost of hole examination) imposed by each placement policy across different memory pressure loads?*
-- **Contents**: Grouped bar chart depicting the mean number of holes scanned per allocation request (`scanned_mean`) with min-max error bars across seeds.
+- **Contents**: Grouped bar chart depicting the mean number of holes scanned per allocation request (`scanned_mean`) with 95% confidence-interval error bars across seeds.
 
 ### `e4_faults_vs_frames.{pdf,png}`
 - **Research Question**: *How do FIFO, LRU, and OPT compare in miss ratios as available physical memory (frames 1–16) expands under locality-of-reference workloads?*
@@ -90,3 +90,7 @@ Generated figures are saved in vector (`.pdf`) and high-resolution raster (`.png
 ### `e4_belady_ac4.{pdf,png}`
 - **Research Question**: *Does the First-In, First-Out (FIFO) replacement policy exhibit Bélady's anomaly on the canonical reference sequence, and where does the anomaly manifest?*
 - **Contents**: Line plot of page faults against frame count (1 to 6) for the 12-reference sequence `1 2 3 4 1 2 5 1 2 3 4 5`, featuring an annotated callout at the Bélady anomaly point (3 → 4 frames: 9 → 10 faults).
+
+## Summary tables and provenance
+
+`analysis/summarize.py` (run last by `run_all.sh`) aggregates each condition over its seeds into mean, sample standard deviation and the 95% confidence interval of the mean (Student t), writing `results/e1/e1_summary.csv`, `results/e4/e4_summary.csv` and the report tables `report/tables/e1_summary.md` and `report/tables/e4_summary.md`. Every row of `e1.csv` and `e4.csv` records the SHA-256 of its workload file and the git commit that produced it, so each figure and table traces back to exact inputs and code (NFR-6).

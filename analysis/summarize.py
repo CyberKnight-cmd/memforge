@@ -1,7 +1,7 @@
 """Aggregate the experiment CSVs over seeds into mean, std and 95% CI (FR-W4).
 
 Writes results/e1/e1_summary.csv, results/e4/e4_summary.csv and Markdown tables for the report in
-report/tables/. Run after scripts/experiments/e1_placement.sh and e4_frames.sh.
+docs/report/tables/. Run after scripts/experiments/e1_placement.sh and e4_frames.sh.
 """
 
 import csv
@@ -80,12 +80,12 @@ def write_csv(path, rows):
 
 
 def write_md(name, title, lines, note):
-    os.makedirs(os.path.join(ROOT, "report/tables"), exist_ok=True)
-    with open(os.path.join(ROOT, "report/tables", name), "w") as f:
+    os.makedirs(os.path.join(ROOT, "docs/report/tables"), exist_ok=True)
+    with open(os.path.join(ROOT, "docs/report/tables", name), "w") as f:
         f.write(f"**{title}**\n\n" + "\n".join(lines) + "\n" + note)
 
 
 if __name__ == "__main__":
     e1()
     e4()
-    print("[summarize] wrote results/*/*_summary.csv and report/tables/e1_summary.md, e4_summary.md")
+    print("[summarize] wrote results/*/*_summary.csv and docs/report/tables/e1_summary.md, e4_summary.md")

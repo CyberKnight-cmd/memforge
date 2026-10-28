@@ -4,7 +4,7 @@ This section demonstrates the operation of MemForge across its CLI and web inter
 
 ## 24.1 Command-Line Execution Sessions
 
-The CLI sessions presented below are drawn verbatim from [report/tables/cli_examples.md](file:///home/cyberknight/memforge-agy/rep-ops/report/tables/cli_examples.md) and represent actual executions of the `memsim` binary at commit `53039c8`.
+The CLI sessions presented below are drawn verbatim from [docs/report/tables/cli_examples.md](file:///home/cyberknight/memforge-agy/rep-ops/report/tables/cli_examples.md) and represent actual executions of the `memsim` binary at commit `53039c8`.
 
 ### Session 1: Contiguous Policy Comparison on Textbook Five Holes
 

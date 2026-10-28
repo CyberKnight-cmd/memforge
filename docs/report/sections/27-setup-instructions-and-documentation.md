@@ -125,10 +125,10 @@ flowchart TD
     CSV2 --> PLOT2["analysis/plot_e4.py"]
     CSV1 & CSV2 --> SUM["analysis/summarize.py"]
 
-    PLOT1 --> FIG1["report/figures/e1_placement.png<br/>report/figures/e1_scanned_mean.png"]
-    PLOT2 --> FIG2["report/figures/e4_faults_vs_frames.png<br/>report/figures/e4_belady_ac4.png"]
-    SUM --> TAB1["report/tables/e1_summary.md<br/>report/tables/e4_summary.md"]
-    VR --> TAB2["report/tables/verification.md<br/>report/tables/verification.csv"]
+    PLOT1 --> FIG1["docs/report/figures/e1_placement.png<br/>docs/report/figures/e1_scanned_mean.png"]
+    PLOT2 --> FIG2["docs/report/figures/e4_faults_vs_frames.png<br/>docs/report/figures/e4_belady_ac4.png"]
+    SUM --> TAB1["docs/report/tables/e1_summary.md<br/>docs/report/tables/e4_summary.md"]
+    VR --> TAB2["docs/report/tables/verification.md<br/>docs/report/tables/verification.csv"]
 ```
 
 ### 1. Executing Full Experiment Suite
@@ -141,14 +141,14 @@ This script executes:
 2. `scripts/experiments/e4_frames.sh`: Evaluates FIFO, LRU, and OPT across frame allocations from 1 to 16 frames over 10 seeded reference streams of 2,000 accesses each (480 total runs).
 3. `analysis/plot_e1.py`: Generates Figure ![E1 Placement Success](../figures/e1_placement.png) and Figure ![E1 Scanned Holes](../figures/e1_scanned_mean.png).
 4. `analysis/plot_e4.py`: Generates Figure ![E4 Faults vs Frames](../figures/e4_faults_vs_frames.png) and Figure ![E4 Belady AC4](../figures/e4_belady_ac4.png).
-5. `analysis/summarize.py`: Computes sample means and 95% confidence intervals using Student's $t$-distribution ($t = 2.262$ for $N=10$, $df=9$), generating Table 24.1 ([report/tables/e1_summary.md](file:///home/cyberknight/memforge-agy/rep-ops/report/tables/e1_summary.md)) and Table 24.2 ([report/tables/e4_summary.md](file:///home/cyberknight/memforge-agy/rep-ops/report/tables/e4_summary.md)).
+5. `analysis/summarize.py`: Computes sample means and 95% confidence intervals using Student's $t$-distribution ($t = 2.262$ for $N=10$, $df=9$), generating Table 24.1 ([docs/report/tables/e1_summary.md](file:///home/cyberknight/memforge-agy/rep-ops/report/tables/e1_summary.md)) and Table 24.2 ([docs/report/tables/e4_summary.md](file:///home/cyberknight/memforge-agy/rep-ops/report/tables/e4_summary.md)).
 
 ### 2. Validating Acceptance Criteria
 To execute the automated end-to-end verification harness and update the acceptance verification report:
 ```bash
 ./scripts/report/verify_report.sh
 ```
-This script runs the CLI against all acceptance fixtures, validates outputs, and outputs [report/tables/verification.md](file:///home/cyberknight/memforge-agy/rep-ops/report/tables/verification.md).
+This script runs the CLI against all acceptance fixtures, validates outputs, and outputs [docs/report/tables/verification.md](file:///home/cyberknight/memforge-agy/rep-ops/report/tables/verification.md).
 
 ## 27.5 Running the Web Application
 
@@ -204,9 +204,9 @@ The MemForge documentation suite provides complete architectural specifications,
 | [docs/RESEARCH.md](file:///home/cyberknight/memforge-agy/rep-ops/docs/RESEARCH.md) | Annotated review of memory management literature (Silberschatz, Knuth, Belady, Denning). |
 | [.github/CODEOWNERS](file:///home/cyberknight/memforge-agy/rep-ops/.github/CODEOWNERS) | Declarative mapping of repository paths to owners $P_1$ through $P_{10}$. |
 | [.github/workflows/ci.yml](file:///home/cyberknight/memforge-agy/rep-ops/.github/workflows/ci.yml) | GitHub Actions CI workflow covering linting, matrix builds, Valgrind, clang-tidy, and WebAssembly builds. |
-| [report/sections/](file:///home/cyberknight/memforge-agy/rep-ops/report/sections/) | 30-section academic project report detailing theoretical background, implementation details, verification results, and operational workflows. |
-| [report/tables/](file:///home/cyberknight/memforge-agy/rep-ops/report/tables/) | Generated markdown tables: `e1_summary.md` (placement under pressure), `e4_summary.md` (paging faults), `verification.md` (AC matrix), `cli_examples.md` (CLI transcripts). |
-| [report/figures/](file:///home/cyberknight/memforge-agy/rep-ops/report/figures/) | Generated plots: `e1_placement.png`, `e1_scanned_mean.png`, `e4_faults_vs_frames.png`, `e4_belady_ac4.png`. |
+| [docs/report/sections/](file:///home/cyberknight/memforge-agy/rep-ops/report/sections/) | 30-section academic project report detailing theoretical background, implementation details, verification results, and operational workflows. |
+| [docs/report/tables/](file:///home/cyberknight/memforge-agy/rep-ops/report/tables/) | Generated markdown tables: `e1_summary.md` (placement under pressure), `e4_summary.md` (paging faults), `verification.md` (AC matrix), `cli_examples.md` (CLI transcripts). |
+| [docs/report/figures/](file:///home/cyberknight/memforge-agy/rep-ops/report/figures/) | Generated plots: `e1_placement.png`, `e1_scanned_mean.png`, `e4_faults_vs_frames.png`, `e4_belady_ac4.png`. |
 
 ## 27.7 Clean-Room Verification Algorithm
 

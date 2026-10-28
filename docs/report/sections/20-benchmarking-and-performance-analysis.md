@@ -115,7 +115,7 @@ Experiment E4 also evaluates FIFO against Belady's anomaly using the 12-referenc
 
 ![E4 Belady's Anomaly](../figures/e4_belady_ac4.png)
 
-As verified in `report/tables/verification.md`, increasing allocated frames from 3 to 4 increases FIFO page faults from 9 to 10 (vector $[12, 12, 9, 10, 5, 5]$ for frame counts $1 \dots 6$). Over the identical sequence, LRU fault counts decrease monotonically from 10 to 8, and OPT decreases from 7 to 6, confirming compliance with acceptance criterion AC-4.
+As verified in `docs/report/tables/verification.md`, increasing allocated frames from 3 to 4 increases FIFO page faults from 9 to 10 (vector $[12, 12, 9, 10, 5, 5]$ for frame counts $1 \dots 6$). Over the identical sequence, LRU fault counts decrease monotonically from 10 to 8, and OPT decreases from 7 to 6, confirming compliance with acceptance criterion AC-4.
 
 ## 20.3 Execution Performance and Invariant Overhead
 

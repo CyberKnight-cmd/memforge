@@ -17,7 +17,7 @@ Each workload execution models an active process executing in an address space o
 
 ## 18.2 Quantitative Fault Comparison Across Frame Allocations
 
-Table 18.1 reports the mean page faults and $95\%$ confidence intervals across representative frame allocations ($F \in \{2, 4, 8, 12, 16\}$), extracted directly from `report/tables/e4_summary.md`.
+Table 18.1 reports the mean page faults and $95\%$ confidence intervals across representative frame allocations ($F \in \{2, 4, 8, 12, 16\}$), extracted directly from `docs/report/tables/e4_summary.md`.
 
 | Frames ($F$) | FIFO Faults | LRU Faults | OPT Faults | LRU vs FIFO Reduction | OPT vs LRU Bound Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -62,7 +62,7 @@ At $F = 12$ and $F = 16$, memory capacity easily holds the current working set a
 While aggregate statistical runs over smooth locality traces often mask non-monotonic behavior, specialized reference patterns expose FIFO's fundamental vulnerability. Acceptance Criterion 4 (AC-4) executes a frame sweep from $F = 1$ to $F = 6$ on the canonical 12-reference workload defined in `tests/fixtures/ac4_belady.wl`:
 $$\langle 1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5 \rangle$$
 
-Table 18.2 records the exact page faults observed during the sweep, as recorded in `report/tables/cli_examples.md` and verified by `tests/golden/test_ac_fixtures.c`.
+Table 18.2 records the exact page faults observed during the sweep, as recorded in `docs/report/tables/cli_examples.md` and verified by `tests/golden/test_ac_fixtures.c`.
 
 | Allocated Frames ($F$) | FIFO Faults | LRU Faults | OPT Faults | Monotonicity Status |
 | --- | --- | --- | --- | --- |

@@ -4,7 +4,7 @@ To establish formal verification and empirical validation against classical oper
 1. The textbook 20-reference string under 3 physical frames, evaluating First-In, First-Out (FIFO), Least Recently Used (LRU), and Optimal (OPT) replacement.
 2. The canonical 12-reference Bélady string under 3 and 4 physical frames, demonstrating the manifestation of Bélady's anomaly in FIFO and contrasting it with the monotonic behavior of LRU and OPT.
 
-All simulation steps, resident frame layouts, and fault counts match the exact outputs produced by the `memsim refs` CLI command documented in `report/tables/cli_examples.md`.
+All simulation steps, resident frame layouts, and fault counts match the exact outputs produced by the `memsim refs` CLI command documented in `docs/report/tables/cli_examples.md`.
 
 ## 17.1 The Silberschatz 20-Reference Benchmark
 

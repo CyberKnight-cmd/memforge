@@ -1,6 +1,6 @@
 # 14. Memory Allocation Examples and Results
 
-This section presents the empirical validation and comparative evaluation of MemForge's contiguous memory allocation subsystem. It begins with an exhaustive, step-by-step trace of the classic Silberschatz five-holes benchmark (Acceptance Criterion AC-1) across First-Fit, Best-Fit, and Worst-Fit, illustrating why First-Fit and Worst-Fit experience external fragmentation failures on an allocation of 426 units while Best-Fit succeeds. Next, it demonstrates contiguous compaction and allocation retry (Acceptance Criterion AC-2), where full sliding compaction relocates 7 blocks and 781 units to create a unified free hole, permitting the failed 426-unit request to succeed and leaving a final free hole of 533 units at `[1207, 1740)`. Finally, it presents and analyzes the results of Experiment E1 (from `report/tables/e1_summary.md` and associated figures), evaluating allocation success rates, external fragmentation, and search costs across memory pressure regimes.
+This section presents the empirical validation and comparative evaluation of MemForge's contiguous memory allocation subsystem. It begins with an exhaustive, step-by-step trace of the classic Silberschatz five-holes benchmark (Acceptance Criterion AC-1) across First-Fit, Best-Fit, and Worst-Fit, illustrating why First-Fit and Worst-Fit experience external fragmentation failures on an allocation of 426 units while Best-Fit succeeds. Next, it demonstrates contiguous compaction and allocation retry (Acceptance Criterion AC-2), where full sliding compaction relocates 7 blocks and 781 units to create a unified free hole, permitting the failed 426-unit request to succeed and leaving a final free hole of 533 units at `[1207, 1740)`. Finally, it presents and analyzes the results of Experiment E1 (from `docs/report/tables/e1_summary.md` and associated figures), evaluating allocation success rates, external fragmentation, and search costs across memory pressure regimes.
 
 ## 14.1 The Silberschatz Five-Holes Benchmark (AC-1)
 
@@ -140,7 +140,7 @@ Memory Layout Progression (AC-1 Benchmark, Capacity 1740):
 
 Table 14.1: Comparative placement outcomes for the Silberschatz five-holes benchmark (AC-1 verification).
 
-As recorded in `report/tables/cli_examples.md`, the aggregate metrics following the benchmark confirm the theoretical behavior: First-Fit required 23 total hole inspections (mean $1.769$ holes/request), whereas Best-Fit and Worst-Fit each required 29 inspections (mean $2.231$ holes/request). Best-Fit utilized 1207 units with 533 units free, whereas First-Fit and Worst-Fit left 781 units used and 959 units free due to rejecting `a4`.
+As recorded in `docs/report/tables/cli_examples.md`, the aggregate metrics following the benchmark confirm the theoretical behavior: First-Fit required 23 total hole inspections (mean $1.769$ holes/request), whereas Best-Fit and Worst-Fit each required 29 inspections (mean $2.231$ holes/request). Best-Fit utilized 1207 units with 533 units free, whereas First-Fit and Worst-Fit left 781 units used and 959 units free due to rejecting `a4`.
 
 ## 14.2 Compaction and Allocation Retry (AC-2)
 
@@ -187,7 +187,7 @@ Post-Retry Layout (Allocation a4-retry of 426 units succeeds):
 
 Following compaction, all free space coalesces into a single maximal hole spanning $[781, 1740)$ with size $959$. External fragmentation drops instantaneously to $E_{\text{frag}} = 0.000$.
 
-The deferred request is then retried as `alloc P4 a4-retry 426`. Under First-Fit, the single available hole $[781, 1740)$ is immediately selected. The request is placed at **start address 781**, occupying $[781, 1207)$. The remaining unallocated partition forms a single terminal free hole spanning **$[1207, 1740)$ of size 533 units**, matching the acceptance criterion verified in `report/tables/verification.md`.
+The deferred request is then retried as `alloc P4 a4-retry 426`. Under First-Fit, the single available hole $[781, 1740)$ is immediately selected. The request is placed at **start address 781**, occupying $[781, 1207)$. The remaining unallocated partition forms a single terminal free hole spanning **$[1207, 1740)$ of size 533 units**, matching the acceptance criterion verified in `docs/report/tables/verification.md`.
 
 ## 14.3 Empirical Evaluation: Experiment E1
 

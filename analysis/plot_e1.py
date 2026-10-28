@@ -7,7 +7,7 @@ Generates:
 2. Grouped bar chart of scanned_mean (search cost) per target and policy
    with mean and 95% confidence-interval error bars over seeds.
 
-Output formats: PDF and PNG in report/figures/.
+Output formats: PDF and PNG in docs/report/figures/.
 Academic style: white background, no titles inside figures, labelled axes with
 units, legend without frame, colour-blind-safe colours (#0072B2, #009E73, #D55E00),
 6.5x3.2 inch, 10pt fonts.
@@ -177,7 +177,7 @@ def plot_e1(csv_path, output_dir):
 
     fig1_pdf = os.path.join(output_dir, "e1_placement.pdf")
     fig1_png = os.path.join(output_dir, "e1_placement.png")
-    fig.savefig(fig1_pdf, bbox_inches="tight")
+    fig.savefig(fig1_pdf, bbox_inches="tight", metadata={"CreationDate": None, "ModDate": None})
     fig.savefig(fig1_png, bbox_inches="tight", dpi=300)
     plt.close(fig)
 
@@ -224,7 +224,7 @@ def plot_e1(csv_path, output_dir):
 
     fig2_pdf = os.path.join(output_dir, "e1_scanned_mean.pdf")
     fig2_png = os.path.join(output_dir, "e1_scanned_mean.png")
-    fig2.savefig(fig2_pdf, bbox_inches="tight")
+    fig2.savefig(fig2_pdf, bbox_inches="tight", metadata={"CreationDate": None, "ModDate": None})
     fig2.savefig(fig2_png, bbox_inches="tight", dpi=300)
     plt.close(fig2)
 
@@ -234,7 +234,7 @@ def plot_e1(csv_path, output_dir):
 def main():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     csv_path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(repo_root, "results", "e1", "e1.csv")
-    output_dir = sys.argv[2] if len(sys.argv) > 2 else os.path.join(repo_root, "report", "figures")
+    output_dir = sys.argv[2] if len(sys.argv) > 2 else os.path.join(repo_root, "docs", "report", "figures")
     plot_e1(csv_path, output_dir)
 
 

@@ -7,7 +7,7 @@ Generates:
 2. Separate figure of the AC-4 reference string under FIFO (1..6 frames)
    with Bélady's anomaly explicitly annotated.
 
-Output formats: PDF and PNG in report/figures/.
+Output formats: PDF and PNG in docs/report/figures/.
 Academic style: white background, no titles inside figures, labelled axes with
 units, legend without frame, colour-blind-safe colours (#0072B2, #009E73, #D55E00),
 6.5x3.2 inch, 10pt fonts.
@@ -135,7 +135,7 @@ def plot_e4(e4_csv, ac4_csv, output_dir):
 
     fig1_pdf = os.path.join(output_dir, "e4_faults_vs_frames.pdf")
     fig1_png = os.path.join(output_dir, "e4_faults_vs_frames.png")
-    fig1.savefig(fig1_pdf, bbox_inches="tight")
+    fig1.savefig(fig1_pdf, bbox_inches="tight", metadata={"CreationDate": None, "ModDate": None})
     fig1.savefig(fig1_png, bbox_inches="tight", dpi=300)
     plt.close(fig1)
 
@@ -221,7 +221,7 @@ def plot_e4(e4_csv, ac4_csv, output_dir):
 
     fig2_pdf = os.path.join(output_dir, "e4_belady_ac4.pdf")
     fig2_png = os.path.join(output_dir, "e4_belady_ac4.png")
-    fig2.savefig(fig2_pdf, bbox_inches="tight")
+    fig2.savefig(fig2_pdf, bbox_inches="tight", metadata={"CreationDate": None, "ModDate": None})
     fig2.savefig(fig2_png, bbox_inches="tight", dpi=300)
     plt.close(fig2)
 
@@ -232,7 +232,7 @@ def main():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     e4_csv = sys.argv[1] if len(sys.argv) > 1 else os.path.join(repo_root, "results", "e4", "e4.csv")
     ac4_csv = sys.argv[2] if len(sys.argv) > 2 else os.path.join(repo_root, "results", "e4", "belady_ac4.csv")
-    output_dir = sys.argv[3] if len(sys.argv) > 3 else os.path.join(repo_root, "report", "figures")
+    output_dir = sys.argv[3] if len(sys.argv) > 3 else os.path.join(repo_root, "docs", "report", "figures")
     plot_e4(e4_csv, ac4_csv, output_dir)
 
 

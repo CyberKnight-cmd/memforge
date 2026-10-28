@@ -71,7 +71,7 @@ Contains the frame sweep (1 to 6 frames) of the canonical Bélady AC-4 reference
 
 ## 3. Report Figures and Research Questions
 
-Generated figures are saved in vector (`.pdf`) and high-resolution raster (`.png`, 300 dpi) formats in `report/figures/`. All figures follow academic formatting guidelines (white background, no embedded titles, labelled axes with units, unframed legends, colour-blind-safe Wong palette, 6.5×3.2 in, 10pt font).
+Generated figures are saved in vector (`.pdf`) and high-resolution raster (`.png`, 300 dpi) formats in `docs/report/figures/`. All figures follow academic formatting guidelines (white background, no embedded titles, labelled axes with units, unframed legends, colour-blind-safe Wong palette, 6.5×3.2 in, 10pt font).
 
 ### `e1_placement.{pdf,png}`
 - **Research Question**: *Which contiguous placement policy (First-Fit, Best-Fit, or Worst-Fit) achieves the highest allocation success rate and lowest fragmentation-induced failure rate under varying memory pressure?*
@@ -93,4 +93,4 @@ Generated figures are saved in vector (`.pdf`) and high-resolution raster (`.png
 
 ## Summary tables and provenance
 
-`analysis/summarize.py` (run last by `run_all.sh`) aggregates each condition over its seeds into mean, sample standard deviation and the 95% confidence interval of the mean (Student t), writing `results/e1/e1_summary.csv`, `results/e4/e4_summary.csv` and the report tables `report/tables/e1_summary.md` and `report/tables/e4_summary.md`. Every row of `e1.csv` and `e4.csv` records the SHA-256 of its workload file and the git commit that produced it, so each figure and table traces back to exact inputs and code (NFR-6).
+`analysis/summarize.py` (run last by `run_all.sh`) aggregates each condition over its seeds into mean, sample standard deviation and the 95% confidence interval of the mean (Student t), writing `results/e1/e1_summary.csv`, `results/e4/e4_summary.csv` and the report tables `docs/report/tables/e1_summary.md` and `docs/report/tables/e4_summary.md`. Every row of `e1.csv` and `e4.csv` records the SHA-256 of its workload file and the git commit that produced it, so each figure and table traces back to exact inputs and code (NFR-6).

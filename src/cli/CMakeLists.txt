@@ -1,2 +1,2 @@
-add_executable(memsim main.c)
+add_executable(memsim main.c sha256.c)
 target_link_libraries(memsim PRIVATE memsim::bench memsim_flags)

@@ -501,6 +501,48 @@ static void test_refs_locality_edge_cases(void) {
     }
 }
 
+/* With a utilisation target, emitted live units never exceed target + one maximal block. */
+static void test_alloc_uniform_target_util(void) {
+    ms_wl_alloc_uniform_params p = {.seed = 3,
+                                    .ops = 2000,
+                                    .memory_size = 1000,
+                                    .size_min = 10,
+                                    .size_max = 50,
+                                    .p_alloc_ppm = 1000000,
+                                    .target_util_ppm = 500000};
+    FILE *f = tmpfile();
+    CHECK(f != NULL);
+    CHECK_EQ_INT(ms_wl_gen_alloc_uniform(&p, f), MS_OK);
+    long len = ftell(f);
+    rewind(f);
+    char *text = malloc((size_t)len + 1);
+    CHECK(fread(text, 1, (size_t)len, f) == (size_t)len);
+    ms_workload w = {0};
+    ms_wl_error err = {0};
+    CHECK_EQ_INT(ms_wl_parse(text, (size_t)len, &w, &err), MS_OK);
+    int64_t *size_of = calloc(w.n_ids, sizeof *size_of);
+    int64_t live = 0;
+    int64_t peak = 0;
+    size_t frees = 0;
+    for (size_t i = 0; i < w.n_ops; i++) {
+        if (w.ops[i].kind == MS_OP_ALLOC) {
+            size_of[w.ops[i].u.alloc.id] = w.ops[i].u.alloc.size;
+            live += w.ops[i].u.alloc.size;
+        } else if (w.ops[i].kind == MS_OP_FREE) {
+            live -= size_of[w.ops[i].u.free.id];
+            frees++;
+        }
+        peak = live > peak ? live : peak;
+    }
+    CHECK(peak <= 500 + 50);
+    CHECK(peak >= 500);
+    CHECK(frees > 0);
+    free(size_of);
+    ms_wl_free(&w);
+    free(text);
+    (void)fclose(f);
+}
+
 int main(void) {
     RUN_TEST(test_alloc_uniform_valid_and_parse);
     RUN_TEST(test_refs_locality_valid_and_parse);
@@ -510,5 +552,6 @@ int main(void) {
     RUN_TEST(test_refs_locality_invalid_params);
     RUN_TEST(test_alloc_uniform_edge_probabilities);
     RUN_TEST(test_refs_locality_edge_cases);
+    RUN_TEST(test_alloc_uniform_target_util);
     TEST_EXIT();
 }

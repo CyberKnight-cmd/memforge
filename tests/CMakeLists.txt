@@ -34,3 +34,7 @@ file(GLOB_RECURSE MEMSIM_SYSTEM_TESTS CONFIGURE_DEPENDS
 foreach(src IN LISTS MEMSIM_SYSTEM_TESTS)
   memsim_add_test(${src} memsim::bench)
 endforeach()
+
+if(NOT MEMSIM_VALGRIND)
+  add_test(NAME cli_smoke COMMAND bash ${PROJECT_SOURCE_DIR}/scripts/smoke_cli.sh $<TARGET_FILE:memsim>)
+endif()

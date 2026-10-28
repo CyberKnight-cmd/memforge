@@ -254,6 +254,17 @@ static void format_placement_res(const ms_bench_placement *pl, char *buf, size_t
     }
 }
 
+/* Fixture setup blocks owned by SYS are noise in the placement table; --json keeps them. */
+static bool is_setup_alloc(const ms_workload *w, ms_alloc_id id) {
+    for (size_t i = 0; i < w->n_ops; i++) {
+        const ms_op *op = &w->ops[i];
+        if (op->kind == MS_OP_ALLOC && op->u.alloc.id == id) {
+            return op->u.alloc.pid < w->n_pids && strcmp(w->pid_names[op->u.alloc.pid], "SYS") == 0;
+        }
+    }
+    return false;
+}
+
 static void compute_placement_col_widths(const ms_workload *w, char *const *policies,
                                          size_t n_policies, const ms_bench_result *results,
                                          size_t *col_widths) {
@@ -267,6 +278,9 @@ static void compute_placement_col_widths(const ms_workload *w, char *const *poli
     for (size_t i = 0; i < n_placements; i++) {
         const char *id_str = "";
         ms_alloc_id id = results[0].placements[i].id;
+        if (is_setup_alloc(w, id)) {
+            continue;
+        }
         if (w->id_names != NULL && id < w->n_ids && w->id_names[id] != NULL) {
             id_str = w->id_names[id];
         }
@@ -308,6 +322,9 @@ static void print_compare_placements_table(const ms_workload *w, char *const *po
     for (size_t i = 0; i < n_placements; i++) {
         const char *id_str = "";
         ms_alloc_id id = results[0].placements[i].id;
+        if (is_setup_alloc(w, id)) {
+            continue;
+        }
         if (w->id_names != NULL && id < w->n_ids && w->id_names[id] != NULL) {
             id_str = w->id_names[id];
         }

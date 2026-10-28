@@ -60,7 +60,9 @@ static void set_error(ms_wl_error *err, size_t line, const char *fmt, ...) {
     err->line = line;
     va_list ap;
     va_start(ap, fmt);
-    (void)vsnprintf(err->message, sizeof(err->message), fmt, ap);
+    /* ap is initialised by va_start above; clang-analyzer 18 misreports this pattern. */
+    (void)vsnprintf(err->message, sizeof(err->message), fmt,
+                    ap); // NOLINT(clang-analyzer-valist.Uninitialized)
     va_end(ap);
 }
 

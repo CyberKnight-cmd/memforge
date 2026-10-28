@@ -10,6 +10,10 @@
 #include "memsim/common/types.h"
 
 typedef struct ms_page_frame_view ms_page_frame_view; /* R and D bits; the engine implements it */
+uint32_t ms_page_view_frames(const ms_page_frame_view *v);
+ms_page_key ms_page_view_owner(const ms_page_frame_view *v, uint32_t frame);
+bool ms_page_view_referenced(const ms_page_frame_view *v, uint32_t frame);
+bool ms_page_view_dirty(const ms_page_frame_view *v, uint32_t frame);
 
 typedef struct {
     const char *name;

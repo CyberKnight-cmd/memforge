@@ -123,3 +123,59 @@ All animations strictly use the Web Animations API (`element.animate`) and CSS t
 - **Scrubbing & Motion Preferences**:
   - Dragging the timeline scrubber or jumping multiple steps executes instant rendering with zero animation.
   - `@media (prefers-reduced-motion: reduce)` disables all spatial motion, replacing movements with 120ms opacity fades.
+
+---
+
+## 7. Demo Scenarios, Chapters, and Multi-View Architectures
+
+MemForge features interactive demo scenarios tailored for live classroom presentations and academic walkthroughs, providing specialized comparative and analytical layouts while maintaining existing typography, color tokens, and animation timing rules:
+
+### 7.1 Scenario Selection & Empty State
+- **Top Bar Selector**: A `<select id="scenario-select">` menu provides instant access to the four core scenarios, as well as an "Open your own trace" option that activates the native file picker.
+- **Empty State Cards**: The initial empty state prominently displays four primary scenario buttons with one-line mechanism summaries:
+  1. *"Placement: First, Best and Worst Fit"* (Stacked comparison over AC-1 workloads)
+  2. *"Fragmentation and compaction"* (Single-trace sliding compaction over AC-2)
+  3. *"Page replacement: FIFO, LRU and OPT"* (Textbook matrix with policy tabs over AC-3)
+  4. *"Belady's anomaly"* (Fault sweep chart and dual FIFO replays over AC-4)
+
+### 7.2 Chapters & Storyline Navigation
+Chapters are computed deterministically from trace events to bookmark critical simulator milestones:
+- **Contiguous Extraction**:
+  - `"Holes ready"`: Initial snapshot state before the first non-SYS allocation request.
+  - Per-request markers: `<id> requests <size>` for each user allocation.
+  - `"Request fails"`: The first `AllocationFailed` event due to external fragmentation or capacity exhaustion.
+  - `"Compaction"`: Triggering of `CompactionStarted`.
+  - `"Retry succeeds"`: The first `BlockAllocated` successfully satisfied post-compaction.
+- **Paging Extraction**:
+  - `"First fault"`: Initial `PageFault` compulsory miss.
+  - `"First eviction"`: First `PageEvicted` or `VictimSelected` under frame exhaustion.
+  - `"End"`: Final reference and simulation summary.
+- **Display & Limits**:
+  - Max 9 chapters; per-request entries are prioritized for truncation if limits are exceeded.
+  - Rendered as small 12px mono labels above the scrubber track (`--muted`, active in `--text`) and dashed vertical reference rules with titles in the step chart.
+- **Keyboard Controls**:
+  - Keys `1` through `9`: Instantly seeks to Chapter N.
+  - Key `N` (lowercase): Advances to next chapter.
+  - Key `Shift+N`: Steps back to previous chapter.
+
+### 7.3 Compare View (Stacked Allocation Policies)
+- **Visual Structure**: Three full-width contiguous memory strips (First-Fit, Best-Fit, Worst-Fit) stacked vertically, each fixed at 64px height.
+- **Outcomes & Alignment**: Each strip header denotes the policy name on the left and current outcome status on the right (e.g. `"placed at 1140"` or `"fails: fragmentation"` in `--bad`). Only the final strip renders the address ruler to prevent visual clutter.
+- **Synchronized Playback**: All three strips share a unified step index, scrubber, and transport controls. Ghost bars, splitting dissolves, and failure shake brackets run simultaneously across strips.
+- **Per-Policy Narrations**: Compact 15px mechanism sentences explain placement or failure for each allocator.
+- **Aligned Comparison Table**: A 3-column table tracking Free units, Largest hole, Hole count, External fragmentation percentage, and cumulative Failure counts. The optimal metric per row is highlighted in `--ok`.
+
+### 7.4 Replacement View (Policy Tabs)
+- **WAI-ARIA Tablist**: Accessible tabs (`role="tablist"`, `role="tab"`) display dynamic fault counts: `"FIFO 15 faults"`, `"LRU 12 faults"`, and `"OPT 9 faults"`.
+- **Keyboard Semantics**: Left/Right arrow keys cycle through policies with roving `tabindex` and automatic focus management.
+- **Index Preservation**: Switching policy tabs maintains the presenter's exact current step index, allowing direct comparison of resident frames at any reference moment.
+
+### 7.5 Belady's Anomaly View
+- **Left Column (3/5)**: An SVG line chart (540x340 viewBox) plotting page faults ($y \ge 0$) against physical frames ($1 \le x \le 6$):
+  - **FIFO**: Solid 2px line in `--text` with 4px circular data points.
+  - **LRU**: 1px dashed line in `--muted` with 4px circular data points.
+  - **OPT**: 1px dotted line in `--muted` with 4px circular data points.
+  - **Anomaly Indicator**: Frame counts from `sweeps.fifo.belady_points` are circled in `--bad` with a descriptive label: `"4 frames: 10 faults, more than 9 with 3 frames"`.
+  - **Axes & Ticks**: Mono coordinate ticks with sans-serif `"frames"` and `"page faults"` labels.
+- **Right Column (2/5)**: Dual vertically stacked textbook replacement tables (`ac4_fifo_f3` with 3 frames above `ac4_fifo_f4` with 4 frames). Both tables scrub in unison from the shared bottom transport bar, labeled with frame capacity and total faults.
+

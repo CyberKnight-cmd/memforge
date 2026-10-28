@@ -27,11 +27,13 @@
         <span>Open trace</span>
       </button>
 
-      <select id="sample-select" class="select-top" aria-label="Sample traces">
-        <option value="" disabled selected>Sample traces</option>
-        <option value="ac1">AC-1 First-Fit</option>
-        <option value="ac2">AC-2 Compaction</option>
-        <option value="ac3">AC-3 Paging FIFO</option>
+      <select id="scenario-select" class="select-top" aria-label="Scenario">
+        <option value="" disabled selected>Scenario</option>
+        <option value="scenario-1">Placement: First, Best and Worst Fit</option>
+        <option value="scenario-2">Fragmentation and compaction</option>
+        <option value="scenario-3">Page replacement: FIFO, LRU and OPT</option>
+        <option value="scenario-4">Belady's anomaly</option>
+        <option value="open-trace">Open your own trace</option>
       </select>
 
       <button type="button" id="btn-theme-toggle" class="btn btn-top btn-icon" aria-label="Toggle theme">
@@ -51,6 +53,8 @@
           <div class="shortcut-row"><span class="shortcut-key mono">Space</span><span class="shortcut-desc">Play / pause</span></div>
           <div class="shortcut-row"><span class="shortcut-key mono">&larr; / &rarr;</span><span class="shortcut-desc">Step back / step forward</span></div>
           <div class="shortcut-row"><span class="shortcut-key mono">Home / End</span><span class="shortcut-desc">Skip to start / skip to end</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">1-9</span><span class="shortcut-desc">Jump to chapter N</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">N / Shift+N</span><span class="shortcut-desc">Next / previous chapter</span></div>
           <div class="shortcut-row"><span class="shortcut-key mono">T</span><span class="shortcut-desc">Toggle dark / light theme</span></div>
           <div class="shortcut-row"><span class="shortcut-key mono">?</span><span class="shortcut-desc">Show / hide this help</span></div>
           <div class="shortcut-row"><span class="shortcut-key mono">Esc</span><span class="shortcut-desc">Close popovers</span></div>
@@ -66,24 +70,28 @@
     <div id="empty-state" class="empty-state">
       <div class="empty-card">
         <h1 class="empty-heading">Open a MemForge trace</h1>
-        <p class="empty-description">Drop a .jsonl file produced by memsim, or start with a sample.</p>
+        <p class="empty-description">Drop a .jsonl file produced by memsim, or select a demo scenario.</p>
         <button type="button" id="btn-empty-open" class="btn btn-primary" aria-label="Open trace">
           <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5 C2 3.7 2.7 3 3.5 3 H6 L7.5 5 H12.5 C13.3 5 14 5.7 14 6.5 V11.5 C14 12.3 13.3 13 12.5 13 H3.5 C2.7 13 2 12.3 2 11.5 Z" /></svg>
           <span>Open trace</span>
         </button>
 
-        <div class="sample-list" aria-label="Sample Traces">
-          <button type="button" class="btn-sample-card" data-sample="ac1">
-            <span class="sample-title mono">AC-1 First-Fit</span>
-            <span class="sample-desc">Silberschatz 5 holes with external fragmentation failure</span>
+        <div class="sample-list" aria-label="Demo Scenarios">
+          <button type="button" class="btn-sample-card" data-scenario="scenario-1">
+            <span class="sample-title mono">Placement: First, Best and Worst Fit</span>
+            <span class="sample-desc">Three placement policies stacked side-by-side on identical allocation requests</span>
           </button>
-          <button type="button" class="btn-sample-card" data-sample="ac2">
-            <span class="sample-title mono">AC-2 Compaction</span>
-            <span class="sample-desc">Sliding compaction resolving fragmentation and retrying request</span>
+          <button type="button" class="btn-sample-card" data-scenario="scenario-2">
+            <span class="sample-title mono">Fragmentation and compaction</span>
+            <span class="sample-desc">Sliding compaction resolving external fragmentation to satisfy a blocked request</span>
           </button>
-          <button type="button" class="btn-sample-card" data-sample="ac3">
-            <span class="sample-title mono">AC-3 Paging FIFO</span>
-            <span class="sample-desc">Paging reference string across 3 physical frames with FIFO replacement</span>
+          <button type="button" class="btn-sample-card" data-scenario="scenario-3">
+            <span class="sample-title mono">Page replacement: FIFO, LRU and OPT</span>
+            <span class="sample-desc">Textbook replacement matrix and fault metrics compared across policies</span>
+          </button>
+          <button type="button" class="btn-sample-card" data-scenario="scenario-4">
+            <span class="sample-title mono">Belady's anomaly</span>
+            <span class="sample-desc">More physical frames causing more page faults under FIFO replacement</span>
           </button>
         </div>
 
@@ -100,6 +108,13 @@
           <h2 id="heading-memory-panel" class="panel-heading">Memory</h2>
         </div>
 
+        <!-- Replacement View Policy Tabs -->
+        <div id="replacement-tabs" class="replacement-tabs" role="tablist" aria-label="Page replacement policy" hidden>
+          <button type="button" role="tab" id="tab-fifo" class="btn-tab active" aria-selected="true" aria-controls="paging-viewport" tabindex="0">FIFO 15 faults</button>
+          <button type="button" role="tab" id="tab-lru" class="btn-tab" aria-selected="false" aria-controls="paging-viewport" tabindex="-1">LRU 12 faults</button>
+          <button type="button" role="tab" id="tab-opt" class="btn-tab" aria-selected="false" aria-controls="paging-viewport" tabindex="-1">OPT 9 faults</button>
+        </div>
+
         <!-- Contiguous Visualization Viewport -->
         <div id="contiguous-viewport" class="contiguous-viewport">
           <div class="memory-stage">
@@ -107,6 +122,63 @@
             <div id="memory-strip" class="memory-strip" role="region" aria-label="Contiguous memory layout"></div>
             <div id="address-ruler" class="address-ruler" aria-hidden="true"></div>
             <div id="failure-bracket" class="failure-bracket" hidden aria-hidden="true"></div>
+          </div>
+        </div>
+
+        <!-- Compare Visualization Viewport (Three policies stacked) -->
+        <div id="compare-viewport" class="compare-viewport" hidden>
+          <div class="compare-strip-group">
+            <div class="compare-strip-header">
+              <span class="compare-policy mono">First-Fit</span>
+              <span id="compare-outcome-0" class="compare-outcome mono">ready</span>
+            </div>
+            <div class="memory-stage compare-stage">
+              <div id="compare-ghost-0" class="ghost-host" aria-hidden="true"></div>
+              <div id="compare-strip-0" class="memory-strip compare-strip" role="region" aria-label="First-Fit memory strip"></div>
+              <div id="compare-bracket-0" class="failure-bracket" hidden aria-hidden="true"></div>
+            </div>
+          </div>
+
+          <div class="compare-strip-group">
+            <div class="compare-strip-header">
+              <span class="compare-policy mono">Best-Fit</span>
+              <span id="compare-outcome-1" class="compare-outcome mono">ready</span>
+            </div>
+            <div class="memory-stage compare-stage">
+              <div id="compare-ghost-1" class="ghost-host" aria-hidden="true"></div>
+              <div id="compare-strip-1" class="memory-strip compare-strip" role="region" aria-label="Best-Fit memory strip"></div>
+              <div id="compare-bracket-1" class="failure-bracket" hidden aria-hidden="true"></div>
+            </div>
+          </div>
+
+          <div class="compare-strip-group">
+            <div class="compare-strip-header">
+              <span class="compare-policy mono">Worst-Fit</span>
+              <span id="compare-outcome-2" class="compare-outcome mono">ready</span>
+            </div>
+            <div class="memory-stage compare-stage">
+              <div id="compare-ghost-2" class="ghost-host" aria-hidden="true"></div>
+              <div id="compare-strip-2" class="memory-strip compare-strip" role="region" aria-label="Worst-Fit memory strip"></div>
+              <div id="compare-address-ruler" class="address-ruler" aria-hidden="true"></div>
+              <div id="compare-bracket-2" class="failure-bracket" hidden aria-hidden="true"></div>
+            </div>
+          </div>
+
+          <div class="compare-bottom">
+            <div id="compare-narrations" class="compare-narrations" aria-live="polite"></div>
+            <div class="compare-table-wrapper">
+              <table class="compare-table mono" id="compare-table">
+                <thead>
+                  <tr>
+                    <th class="compare-th-metric">Metric</th>
+                    <th class="compare-th-col">First-Fit</th>
+                    <th class="compare-th-col">Best-Fit</th>
+                    <th class="compare-th-col">Worst-Fit</th>
+                  </tr>
+                </thead>
+                <tbody id="compare-tbody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -175,6 +247,46 @@
 
     </div>
 
+    <!-- Belady Anomaly Grid (3/5 chart / 2/5 textbook tables) -->
+    <div id="belady-grid" class="belady-grid" hidden>
+      <section class="panel panel-belady-chart" aria-labelledby="heading-belady-chart">
+        <div class="panel-header">
+          <h2 id="heading-belady-chart" class="panel-heading">Belady's Anomaly Sweep (1–6 frames)</h2>
+        </div>
+        <div class="belady-chart-wrapper">
+          <svg id="belady-chart-svg" class="belady-chart-svg" viewBox="0 0 540 340" aria-label="Belady anomaly fault sweep" role="img"></svg>
+        </div>
+      </section>
+
+      <section class="panel panel-belady-tables" aria-labelledby="heading-belady-tables">
+        <div class="panel-header">
+          <h2 id="heading-belady-tables" class="panel-heading">FIFO Replay Comparison</h2>
+        </div>
+        <div class="belady-tables-scroll">
+          <div class="belady-table-group">
+            <div class="belady-table-title mono" id="belady-title-f3">FIFO · 3 frames · 9 faults</div>
+            <div id="belady-f3-table-wrapper" class="paging-table-wrapper belady-subtable" role="region" aria-label="FIFO 3 frames replacement table">
+              <table class="paging-table" id="belady-f3-table">
+                <thead id="belady-f3-thead"></thead>
+                <tbody id="belady-f3-tbody"></tbody>
+                <tfoot id="belady-f3-tfoot"></tfoot>
+              </table>
+            </div>
+          </div>
+          <div class="belady-table-group">
+            <div class="belady-table-title mono" id="belady-title-f4">FIFO · 4 frames · 10 faults</div>
+            <div id="belady-f4-table-wrapper" class="paging-table-wrapper belady-subtable" role="region" aria-label="FIFO 4 frames replacement table">
+              <table class="paging-table" id="belady-f4-table">
+                <thead id="belady-f4-thead"></thead>
+                <tbody id="belady-f4-tbody"></tbody>
+                <tfoot id="belady-f4-tfoot"></tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
   </main>
 
   <!-- Transport Bar (Fixed bottom 56px) -->
@@ -201,9 +313,12 @@
 
     <div class="step-counter mono" id="step-counter" aria-label="Current step">0 / 0</div>
 
-    <div class="scrubber-wrapper">
-      <div id="scrubber-ticks" class="scrubber-ticks" aria-hidden="true"></div>
-      <input type="range" id="scrubber-range" class="scrubber-range" min="0" max="0" value="0" aria-label="Timeline scrubber">
+    <div class="scrubber-area">
+      <div id="chapters-container" class="chapters-container" aria-label="Chapters"></div>
+      <div class="scrubber-wrapper">
+        <div id="scrubber-ticks" class="scrubber-ticks" aria-hidden="true"></div>
+        <input type="range" id="scrubber-range" class="scrubber-range" min="0" max="0" value="0" aria-label="Timeline scrubber">
+      </div>
     </div>
 
     <div class="speed-control">
@@ -216,6 +331,7 @@
     </div>
   </footer>
 
+  <script src="scenarios-data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

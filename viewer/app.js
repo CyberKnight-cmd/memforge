@@ -441,7 +441,7 @@
     /**
      * Renders contiguous strip and triggers signature animations when appropriate.
      */
-    static renderContiguous(container, step, prevStep, animate = false, onHoverBlock = null) {
+    static renderContiguous(container, step, prevStep, animate = false, onHoverBlock = null, customGhostHost = null, customFailureBracket = null) {
       if (!container) return;
       container.innerHTML = '';
 
@@ -455,9 +455,9 @@
       const stripWidth = container.clientWidth || 800;
 
       // Clean up previous animations or ghosts
-      const ghostHost = document.getElementById('ghost-host');
+      const ghostHost = customGhostHost || document.getElementById('ghost-host');
       if (ghostHost) ghostHost.innerHTML = '';
-      const failureBracket = document.getElementById('failure-bracket');
+      const failureBracket = customFailureBracket || document.getElementById('failure-bracket');
       if (failureBracket) {
         failureBracket.hidden = true;
         failureBracket.innerHTML = '';
@@ -617,7 +617,7 @@
               if (allocEv) {
                 // Success: drop into place
                 ghost.style.top = '0px';
-                ghost.style.height = '88px';
+                ghost.style.height = `${container.clientHeight || 88}px`;
                 ghost.style.opacity = '0';
                 setTimeout(() => ghost.remove(), 160);
 
@@ -1077,7 +1077,7 @@
     /**
      * Renders inline SVG step chart with stepped line, baseline ticks, and click-to-seek.
      */
-    static renderStepChart(svg, trace, currentStepIdx, onSeek) {
+    static renderStepChart(svg, trace, currentStepIdx, onSeek, chapters = []) {
       if (!svg || !trace || !trace.steps) return;
       svg.innerHTML = '';
 
@@ -1086,7 +1086,7 @@
       const W = 360;
       const H = 120;
       const padX = 12;
-      const padTop = 12;
+      const padTop = 14;
       const baselineY = H - 16;
       const chartH = baselineY - padTop;
 
@@ -1184,6 +1184,32 @@
         }
       });
 
+      // 3.5. Chapter markers in step chart
+      if (chapters && chapters.length > 0) {
+        chapters.forEach(ch => {
+          const x = getX(ch.step);
+          const chLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          chLine.setAttribute('x1', x);
+          chLine.setAttribute('y1', padTop);
+          chLine.setAttribute('x2', x);
+          chLine.setAttribute('y2', baselineY);
+          chLine.setAttribute('stroke', 'var(--rule)');
+          chLine.setAttribute('stroke-dasharray', '2 2');
+          chLine.setAttribute('stroke-width', '1');
+          svg.appendChild(chLine);
+
+          const chText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          chText.setAttribute('x', x);
+          chText.setAttribute('y', padTop - 3);
+          chText.setAttribute('text-anchor', 'middle');
+          chText.setAttribute('font-size', '8');
+          chText.setAttribute('font-family', 'var(--sans)');
+          chText.setAttribute('fill', ch.step === currentStepIdx ? 'var(--text)' : 'var(--muted)');
+          chText.textContent = ch.title;
+          svg.appendChild(chText);
+        });
+      }
+
       // 4. Vertical playhead line in --accent
       const currX = getX(currentStepIdx);
       const playhead = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -1247,6 +1273,337 @@
   }
 
   /**
+   * Computes key chapters from trace events for navigation markers and shortcuts.
+   */
+  function computeChapters(trace) {
+    if (!trace || !trace.steps || trace.steps.length === 0) return [];
+    const chapters = [];
+    const sub = trace.subsystem;
+
+    if (sub === 'contiguous') {
+      let firstNonSysStep = -1;
+      for (const step of trace.steps) {
+        const hasReq = step.events.some(e =>
+          (e.type === 'BlockAllocated' || e.type === 'AllocationFailed') && e.data?.pid && e.data.pid !== 'SYS'
+        );
+        if (hasReq) {
+          firstNonSysStep = step.stepIndex;
+          break;
+        }
+      }
+
+      let holesReadyStep = 0;
+      if (firstNonSysStep > 0) {
+        const compBefore = trace.steps.some(s => s.stepIndex < firstNonSysStep && s.events.some(e => e.type === 'CompactionStarted'));
+        holesReadyStep = compBefore ? 0 : firstNonSysStep - 1;
+      }
+      chapters.push({ step: holesReadyStep, title: 'Holes ready', priority: 1 });
+
+      let hasCompacted = false;
+      let hadRetrySucceeds = false;
+      let hadFirstFail = false;
+
+      trace.steps.forEach(step => {
+        const compEv = step.events.find(e => e.type === 'CompactionStarted');
+        if (compEv) {
+          chapters.push({ step: step.stepIndex, title: 'Compaction', priority: 0 });
+          hasCompacted = true;
+          return;
+        }
+
+        if (hasCompacted && !hadRetrySucceeds) {
+          const allocAfterComp = step.events.find(e => e.type === 'BlockAllocated');
+          if (allocAfterComp) {
+            chapters.push({ step: step.stepIndex, title: 'Retry succeeds', priority: 0 });
+            hadRetrySucceeds = true;
+            return;
+          }
+        }
+
+        const failEv = step.events.find(e => e.type === 'AllocationFailed');
+        if (failEv && !hadFirstFail) {
+          chapters.push({ step: step.stepIndex, title: 'Request fails', priority: 0 });
+          hadFirstFail = true;
+          return;
+        }
+
+        // Per-request chapter
+        const allocEv = step.events.find(e => e.type === 'BlockAllocated' && e.data?.pid && e.data.pid !== 'SYS');
+        if (allocEv) {
+          const id = allocEv.data.id || 'alloc';
+          const size = allocEv.data.requested || allocEv.data.size;
+          chapters.push({ step: step.stepIndex, title: `${id} requests ${size}`, priority: 2, isPerRequest: true });
+        }
+      });
+
+    } else {
+      // Paging rules: "First fault", "First eviction", "End"
+      let hadFirstFault = false;
+      let hadFirstEviction = false;
+
+      trace.steps.forEach(step => {
+        const faultEv = step.events.find(e => e.type === 'PageFault');
+        if (faultEv && !hadFirstFault) {
+          chapters.push({ step: step.stepIndex, title: 'First fault', priority: 1 });
+          hadFirstFault = true;
+        }
+
+        const evictEv = step.events.find(e => e.type === 'PageEvicted' || e.type === 'VictimSelected');
+        if (evictEv && !hadFirstEviction) {
+          chapters.push({ step: step.stepIndex, title: 'First eviction', priority: 1 });
+          hadFirstEviction = true;
+        }
+      });
+
+      const endStep = trace.steps.length - 1;
+      if (endStep >= 0) {
+        chapters.push({ step: endStep, title: 'End', priority: 1 });
+      }
+    }
+
+    // Deduplicate by step: keep lowest priority number (0 is highest importance)
+    const byStep = new Map();
+    for (const ch of chapters) {
+      if (!byStep.has(ch.step)) {
+        byStep.set(ch.step, ch);
+      } else {
+        const existing = byStep.get(ch.step);
+        if (ch.priority < existing.priority) {
+          byStep.set(ch.step, ch);
+        }
+      }
+    }
+
+    let finalChapters = Array.from(byStep.values()).sort((a, b) => a.step - b.step);
+
+    // If > 9, drop per-request chapters first
+    if (finalChapters.length > 9) {
+      while (finalChapters.length > 9 && finalChapters.some(c => c.isPerRequest)) {
+        const idxToDrop = finalChapters.findIndex(c => c.isPerRequest);
+        finalChapters.splice(idxToDrop, 1);
+      }
+      if (finalChapters.length > 9) {
+        finalChapters = finalChapters.slice(0, 9);
+      }
+    }
+
+    return finalChapters;
+  }
+
+  /**
+   * BeladyChartRenderer: Renders fault sweeps (FIFO, LRU, OPT) vs frame count (1-6)
+   * in an SVG line chart, highlighting Belady anomaly points.
+   */
+  class BeladyChartRenderer {
+    static render(svg, sweeps) {
+      if (!svg || !sweeps) return;
+      svg.innerHTML = '';
+
+      const W = 540;
+      const H = 340;
+      const padL = 60;
+      const padR = 40;
+      const padT = 40;
+      const padB = 50;
+
+      const plotW = W - padL - padR;
+      const plotH = H - padT - padB;
+
+      const xMin = 1, xMax = 6;
+      const yMin = 0, yMax = 15;
+
+      const getX = f => padL + ((f - xMin) / (xMax - xMin)) * plotW;
+      const getY = val => padT + plotH - ((val - yMin) / (yMax - yMin)) * plotH;
+
+      const createEl = (tag, attrs) => {
+        const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+        for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+        return el;
+      };
+
+      // 1. Horizontal grid lines & y ticks
+      const yTicks = [0, 3, 6, 9, 12, 15];
+      yTicks.forEach(val => {
+        const y = getY(val);
+        svg.appendChild(createEl('line', {
+          x1: padL,
+          y1: y,
+          x2: padL + plotW,
+          y2: y,
+          stroke: 'var(--rule)',
+          'stroke-width': '1'
+        }));
+
+        const text = createEl('text', {
+          x: padL - 10,
+          y: y + 4,
+          'text-anchor': 'end',
+          'font-family': 'var(--mono)',
+          'font-size': '11',
+          fill: 'var(--muted)'
+        });
+        text.textContent = String(val);
+        svg.appendChild(text);
+      });
+
+      // 2. Vertical grid lines & x ticks (frames 1..6)
+      for (let f = 1; f <= 6; f++) {
+        const x = getX(f);
+        svg.appendChild(createEl('line', {
+          x1: x,
+          y1: padT,
+          x2: x,
+          y2: padT + plotH,
+          stroke: 'var(--rule)',
+          'stroke-width': '1',
+          'stroke-dasharray': '2 2'
+        }));
+
+        const text = createEl('text', {
+          x: x,
+          y: padT + plotH + 20,
+          'text-anchor': 'middle',
+          'font-family': 'var(--mono)',
+          'font-size': '11',
+          fill: 'var(--muted)'
+        });
+        text.textContent = String(f);
+        svg.appendChild(text);
+      }
+
+      // 3. Axis labels
+      const xLabel = createEl('text', {
+        x: padL + plotW / 2,
+        y: H - 12,
+        'text-anchor': 'middle',
+        'font-family': 'var(--sans)',
+        'font-size': '12',
+        fill: 'var(--text)'
+      });
+      xLabel.textContent = 'frames';
+      svg.appendChild(xLabel);
+
+      const yLabel = createEl('text', {
+        x: padL - 32,
+        y: padT - 16,
+        'font-family': 'var(--sans)',
+        'font-size': '12',
+        fill: 'var(--text)'
+      });
+      yLabel.textContent = 'page faults';
+      svg.appendChild(yLabel);
+
+      // 4. Series (OPT dotted, LRU dashed, FIFO solid)
+      const renderSeries = (frames, faults, strokeColor, strokeWidth, dashArray) => {
+        if (!frames || !faults || frames.length === 0) return;
+        const pts = frames.map((f, i) => `${getX(f)},${getY(faults[i])}`).join(' ');
+        const pathAttrs = {
+          d: 'M ' + pts.replace(/ /g, ' L '),
+          fill: 'none',
+          stroke: strokeColor,
+          'stroke-width': strokeWidth
+        };
+        if (dashArray) pathAttrs['stroke-dasharray'] = dashArray;
+        svg.appendChild(createEl('path', pathAttrs));
+
+        // 4px circles
+        frames.forEach((f, i) => {
+          svg.appendChild(createEl('circle', {
+            cx: getX(f),
+            cy: getY(faults[i]),
+            r: '4',
+            fill: 'var(--bg)',
+            stroke: strokeColor,
+            'stroke-width': strokeWidth
+          }));
+        });
+      };
+
+      // OPT: 1px dotted, --muted
+      if (sweeps.opt) {
+        renderSeries(sweeps.opt.frames, sweeps.opt.faults, 'var(--muted)', '1', '2 2');
+      }
+
+      // LRU: 1px dashed, --muted
+      if (sweeps.lru) {
+        renderSeries(sweeps.lru.frames, sweeps.lru.faults, 'var(--muted)', '1', '4 3');
+      }
+
+      // FIFO: solid, --text
+      if (sweeps.fifo) {
+        renderSeries(sweeps.fifo.frames, sweeps.fifo.faults, 'var(--text)', '2', null);
+      }
+
+      // 5. Belady point(s) from sweeps.fifo.belady_points circled in --bad
+      const beladyPoints = sweeps.fifo?.belady_points || [];
+      beladyPoints.forEach(bpFrame => {
+        const idx = sweeps.fifo.frames.indexOf(bpFrame);
+        if (idx >= 0) {
+          const bpFaults = sweeps.fifo.faults[idx];
+          const prevFaults = sweeps.fifo.faults[idx - 1] || bpFaults;
+          const cx = getX(bpFrame);
+          const cy = getY(bpFaults);
+
+          // Circled in --bad
+          svg.appendChild(createEl('circle', {
+            cx: cx,
+            cy: cy,
+            r: '12',
+            fill: 'none',
+            stroke: 'var(--bad)',
+            'stroke-width': '2'
+          }));
+
+          // Label
+          const label = createEl('text', {
+            x: cx,
+            y: cy - 20,
+            'text-anchor': 'middle',
+            'font-family': 'var(--mono)',
+            'font-size': '11',
+            fill: 'var(--bad)',
+            'font-weight': '600'
+          });
+          label.textContent = `${bpFrame} frames: ${bpFaults} faults, more than ${prevFaults} with ${bpFrame - 1} frames`;
+          svg.appendChild(label);
+        }
+      });
+
+      // 6. Legend
+      const legendG = createEl('g', { transform: `translate(${padL + plotW - 140}, ${padT})` });
+      
+      const drawLegendItem = (yOffset, labelText, strokeColor, dashArray) => {
+        const lineAttrs = {
+          x1: '0',
+          y1: String(yOffset),
+          x2: '24',
+          y2: String(yOffset),
+          stroke: strokeColor,
+          'stroke-width': dashArray ? '1' : '2'
+        };
+        if (dashArray) lineAttrs['stroke-dasharray'] = dashArray;
+        legendG.appendChild(createEl('line', lineAttrs));
+
+        const text = createEl('text', {
+          x: '30',
+          y: String(yOffset + 4),
+          'font-family': 'var(--sans)',
+          'font-size': '11',
+          fill: 'var(--muted)'
+        });
+        text.textContent = labelText;
+        legendG.appendChild(text);
+      };
+
+      drawLegendItem(0, 'FIFO', 'var(--text)', null);
+      drawLegendItem(16, 'LRU', 'var(--muted)', '4 3');
+      drawLegendItem(32, 'OPT', 'var(--muted)', '2 2');
+
+      svg.appendChild(legendG);
+    }
+  }
+
+  /**
    * UIController: Coordinates DOM views, interactions, keyboard navigation,
    * narration generation, and theme management.
    */
@@ -1255,6 +1612,12 @@
       this.engine = new PlaybackEngine();
       this.lastRenderedStep = -1;
       this.isScrubbing = false;
+      this.activeMode = 'single'; // 'single' | 'compare' | 'replacement' | 'belady'
+      this.currentChapters = [];
+      this.compareTraces = [];
+      this.replacementTraces = {};
+      this.activeReplacementPolicy = 'fifo';
+      this.beladyTraces = {};
 
       this.bindDOMElements();
       this.initTheme();
@@ -1268,6 +1631,7 @@
           this.updateTraceHeader();
           this.updateScrubberBounds();
           this.updateEmptyState();
+          this.renderChapters();
         }
         this.updateView();
       });
@@ -1283,6 +1647,7 @@
       this.metaConfig = document.getElementById('meta-config');
       this.fileInput = document.getElementById('file-input');
       this.btnOpenFile = document.getElementById('btn-open-file');
+      this.scenarioSelect = document.getElementById('scenario-select');
       this.sampleSelect = document.getElementById('sample-select');
       this.btnThemeToggle = document.getElementById('btn-theme-toggle');
       this.themeIconSlot = document.getElementById('theme-icon-slot');
@@ -1295,12 +1660,45 @@
       this.loadErrorMessage = document.getElementById('load-error-message');
       this.dashboardGrid = document.getElementById('dashboard-grid');
 
-      // Left panel
+      // Left panel (Memory / Frames)
       this.headingMemoryPanel = document.getElementById('heading-memory-panel');
+      this.replacementTabs = document.getElementById('replacement-tabs');
+      this.tabFifo = document.getElementById('tab-fifo');
+      this.tabLru = document.getElementById('tab-lru');
+      this.tabOpt = document.getElementById('tab-opt');
+
       this.contiguousViewport = document.getElementById('contiguous-viewport');
       this.memoryStrip = document.getElementById('memory-strip');
       this.addressRuler = document.getElementById('address-ruler');
       this.failureBracket = document.getElementById('failure-bracket');
+
+      // Compare Viewport
+      this.compareViewport = document.getElementById('compare-viewport');
+      this.compareStrips = [
+        document.getElementById('compare-strip-0'),
+        document.getElementById('compare-strip-1'),
+        document.getElementById('compare-strip-2')
+      ];
+      this.compareGhosts = [
+        document.getElementById('compare-ghost-0'),
+        document.getElementById('compare-ghost-1'),
+        document.getElementById('compare-ghost-2')
+      ];
+      this.compareBrackets = [
+        document.getElementById('compare-bracket-0'),
+        document.getElementById('compare-bracket-1'),
+        document.getElementById('compare-bracket-2')
+      ];
+      this.compareOutcomes = [
+        document.getElementById('compare-outcome-0'),
+        document.getElementById('compare-outcome-1'),
+        document.getElementById('compare-outcome-2')
+      ];
+      this.compareAddressRuler = document.getElementById('compare-address-ruler');
+      this.compareNarrations = document.getElementById('compare-narrations');
+      this.compareTbody = document.getElementById('compare-tbody');
+
+      // Paging Viewport
       this.pagingViewport = document.getElementById('paging-viewport');
       this.pagingTableWrapper = document.getElementById('paging-table-wrapper');
       this.pagingThead = document.getElementById('paging-thead');
@@ -1315,6 +1713,20 @@
       this.stepChartSvg = document.getElementById('step-chart-svg');
       this.eventsList = document.getElementById('events-list');
 
+      // Belady Grid
+      this.beladyGrid = document.getElementById('belady-grid');
+      this.beladyChartSvg = document.getElementById('belady-chart-svg');
+      this.beladyF3TableWrapper = document.getElementById('belady-f3-table-wrapper');
+      this.beladyF3Thead = document.getElementById('belady-f3-thead');
+      this.beladyF3Tbody = document.getElementById('belady-f3-tbody');
+      this.beladyF3Tfoot = document.getElementById('belady-f3-tfoot');
+      this.beladyF4TableWrapper = document.getElementById('belady-f4-table-wrapper');
+      this.beladyF4Thead = document.getElementById('belady-f4-thead');
+      this.beladyF4Tbody = document.getElementById('belady-f4-tbody');
+      this.beladyF4Tfoot = document.getElementById('belady-f4-tfoot');
+      this.beladyTitleF3 = document.getElementById('belady-title-f3');
+      this.beladyTitleF4 = document.getElementById('belady-title-f4');
+
       // Transport bar
       this.btnSkipStart = document.getElementById('btn-skip-start');
       this.btnStepBack = document.getElementById('btn-step-back');
@@ -1323,6 +1735,7 @@
       this.btnStepForward = document.getElementById('btn-step-forward');
       this.btnSkipEnd = document.getElementById('btn-skip-end');
       this.stepCounter = document.getElementById('step-counter');
+      this.chaptersContainer = document.getElementById('chapters-container');
       this.scrubberTicks = document.getElementById('scrubber-ticks');
       this.scrubberRange = document.getElementById('scrubber-range');
       this.speedSelect = document.getElementById('speed-select');
@@ -1388,7 +1801,18 @@
         if (file) this.loadFile(file);
       });
 
-      // Sample trace selections
+      // Scenario & Sample trace selections
+      if (this.scenarioSelect) {
+        this.scenarioSelect.onchange = () => {
+          const val = this.scenarioSelect.value;
+          if (val === 'open-trace') {
+            this.fileInput?.click();
+          } else if (val) {
+            this.loadScenario(val);
+          }
+        };
+      }
+
       if (this.sampleSelect) {
         this.sampleSelect.onchange = () => {
           const key = this.sampleSelect.value;
@@ -1400,9 +1824,41 @@
 
       document.querySelectorAll('.btn-sample-card').forEach(btn => {
         btn.onclick = () => {
+          const scen = btn.getAttribute('data-scenario');
+          if (scen) {
+            this.loadScenario(scen);
+            return;
+          }
           const key = btn.getAttribute('data-sample');
           if (key && SAMPLE_TRACES[key]) {
             this.loadTraceString(SAMPLE_TRACES[key], `sample_${key}.jsonl`);
+          }
+        };
+      });
+
+      // Replacement view tablist semantics
+      const repTabs = [this.tabFifo, this.tabLru, this.tabOpt].filter(Boolean);
+      repTabs.forEach((tab, idx) => {
+        tab.onclick = () => {
+          const pol = tab.id.replace('tab-', '');
+          this.switchReplacementTab(pol);
+        };
+        tab.onkeydown = (e) => {
+          let nextIdx = -1;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+            nextIdx = (idx + 1) % repTabs.length;
+          } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+            nextIdx = (idx - 1 + repTabs.length) % repTabs.length;
+          } else if (e.key === 'Home') {
+            nextIdx = 0;
+          } else if (e.key === 'End') {
+            nextIdx = repTabs.length - 1;
+          }
+          if (nextIdx >= 0) {
+            e.preventDefault();
+            repTabs[nextIdx].focus();
+            const pol = repTabs[nextIdx].id.replace('tab-', '');
+            this.switchReplacementTab(pol);
           }
         };
       });
@@ -1466,6 +1922,41 @@
           return;
         }
 
+        // Chapter shortcuts 1-9
+        if (e.key >= '1' && e.key <= '9') {
+          const num = parseInt(e.key, 10);
+          if (this.currentChapters && this.currentChapters[num - 1]) {
+            e.preventDefault();
+            this.engine.goToStep(this.currentChapters[num - 1].step);
+          }
+          return;
+        }
+
+        // Chapter next: N (lower case n)
+        if (e.key === 'n' && !e.shiftKey) {
+          if (this.currentChapters && this.currentChapters.length > 0) {
+            const nextCh = this.currentChapters.find(ch => ch.step > this.engine.currentStepIndex);
+            if (nextCh) {
+              e.preventDefault();
+              this.engine.goToStep(nextCh.step);
+            }
+          }
+          return;
+        }
+
+        // Chapter prev: Shift+N (upper case N)
+        if (e.key === 'N' || (e.key === 'n' && e.shiftKey)) {
+          if (this.currentChapters && this.currentChapters.length > 0) {
+            const prevChapters = this.currentChapters.filter(ch => ch.step < this.engine.currentStepIndex);
+            if (prevChapters.length > 0) {
+              e.preventDefault();
+              const prevCh = prevChapters[prevChapters.length - 1];
+              this.engine.goToStep(prevCh.step);
+            }
+          }
+          return;
+        }
+
         switch (e.key) {
           case ' ':
             e.preventDefault();
@@ -1523,7 +2014,152 @@
 
       this.clearLoadError();
       this.currentFilename = filename;
+      this.activeMode = 'single';
+      if (this.scenarioSelect) this.scenarioSelect.value = '';
+      this.currentChapters = computeChapters(parseResult.trace);
       this.engine.loadTrace(parseResult.trace);
+    }
+
+    getScenarioTrace(key) {
+      if (typeof window !== 'undefined' && window.MEMFORGE_SCENARIOS?.traces?.[key]) {
+        return window.MEMFORGE_SCENARIOS.traces[key];
+      }
+      if (typeof global !== 'undefined' && global.MEMFORGE_SCENARIOS?.traces?.[key]) {
+        return global.MEMFORGE_SCENARIOS.traces[key];
+      }
+      return SAMPLE_TRACES[key] || '';
+    }
+
+    loadScenario(scenarioId) {
+      this.clearLoadError();
+      if (this.scenarioSelect) this.scenarioSelect.value = scenarioId;
+
+      if (scenarioId === 'scenario-1') {
+        // 1. Placement: First, Best and Worst Fit — Compare view over ac1_*
+        this.activeMode = 'compare';
+        const t0 = TraceParser.parseTrace(this.getScenarioTrace('ac1_first-fit')).trace;
+        const t1 = TraceParser.parseTrace(this.getScenarioTrace('ac1_best-fit')).trace;
+        const t2 = TraceParser.parseTrace(this.getScenarioTrace('ac1_worst-fit')).trace;
+        this.compareTraces = [t0, t1, t2];
+        this.currentFilename = 'Placement: First, Best and Worst Fit';
+        this.currentChapters = computeChapters(t0);
+        this.engine.loadTrace(t0);
+      } else if (scenarioId === 'scenario-2') {
+        // 2. Fragmentation and compaction — existing single-trace view over ac2_first-fit
+        this.activeMode = 'single';
+        const t = TraceParser.parseTrace(this.getScenarioTrace('ac2_first-fit')).trace;
+        this.currentFilename = 'Fragmentation and compaction';
+        this.currentChapters = computeChapters(t);
+        this.engine.loadTrace(t);
+      } else if (scenarioId === 'scenario-3') {
+        // 3. Page replacement: FIFO, LRU and OPT — Replacement view over ac3_*
+        this.activeMode = 'replacement';
+        const tFifo = TraceParser.parseTrace(this.getScenarioTrace('ac3_fifo')).trace;
+        const tLru = TraceParser.parseTrace(this.getScenarioTrace('ac3_lru')).trace;
+        const tOpt = TraceParser.parseTrace(this.getScenarioTrace('ac3_opt')).trace;
+        this.replacementTraces = { fifo: tFifo, lru: tLru, opt: tOpt };
+        this.activeReplacementPolicy = 'fifo';
+        this.currentFilename = 'Page replacement: FIFO, LRU and OPT';
+        this.updateReplacementTabLabels();
+        const primary = this.replacementTraces.fifo;
+        this.currentChapters = computeChapters(primary);
+        this.engine.loadTrace(primary);
+      } else if (scenarioId === 'scenario-4') {
+        // 4. Belady's anomaly — Belady view over ac4_fifo_f3, ac4_fifo_f4 and sweeps
+        this.activeMode = 'belady';
+        const tF3 = TraceParser.parseTrace(this.getScenarioTrace('ac4_fifo_f3')).trace;
+        const tF4 = TraceParser.parseTrace(this.getScenarioTrace('ac4_fifo_f4')).trace;
+        this.beladyTraces = { f3: tF3, f4: tF4 };
+        this.currentFilename = "Belady's Anomaly";
+        const sweeps = (typeof window !== 'undefined' && window.MEMFORGE_SCENARIOS?.sweeps) || {
+          fifo: { frames: [1, 2, 3, 4, 5, 6], faults: [12, 12, 9, 10, 5, 5], belady_points: [4] },
+          lru: { frames: [1, 2, 3, 4, 5, 6], faults: [12, 12, 10, 8, 5, 5] },
+          opt: { frames: [1, 2, 3, 4, 5, 6], faults: [12, 12, 7, 6, 5, 5] }
+        };
+        BeladyChartRenderer.render(this.beladyChartSvg, sweeps);
+        this.currentChapters = computeChapters(tF3);
+        this.engine.loadTrace(tF3);
+      }
+    }
+
+    updateReplacementTabLabels() {
+      const getFaults = (t) => {
+        if (!t) return 0;
+        if (t.summary?.metrics?.faults !== undefined) return t.summary.metrics.faults;
+        return t.steps.reduce((acc, s) => acc + (s.events.some(e => e.type === 'PageFault') ? 1 : 0), 0);
+      };
+
+      const fFifo = getFaults(this.replacementTraces.fifo);
+      const fLru = getFaults(this.replacementTraces.lru);
+      const fOpt = getFaults(this.replacementTraces.opt);
+
+      if (this.tabFifo) this.tabFifo.textContent = `FIFO ${fFifo} faults`;
+      if (this.tabLru) this.tabLru.textContent = `LRU ${fLru} faults`;
+      if (this.tabOpt) this.tabOpt.textContent = `OPT ${fOpt} faults`;
+    }
+
+    switchReplacementTab(policy) {
+      this.activeReplacementPolicy = policy;
+      const tabs = { fifo: this.tabFifo, lru: this.tabLru, opt: this.tabOpt };
+      for (const [pol, tab] of Object.entries(tabs)) {
+        if (!tab) continue;
+        const isSel = pol === policy;
+        tab.classList.toggle('active', isSel);
+        tab.setAttribute('aria-selected', String(isSel));
+        tab.setAttribute('tabindex', isSel ? '0' : '-1');
+      }
+
+      const targetTrace = this.replacementTraces[policy];
+      if (targetTrace) {
+        const currStep = this.engine.currentStepIndex;
+        this.currentChapters = computeChapters(targetTrace);
+        this.engine.loadTrace(targetTrace);
+        this.engine.goToStep(currStep);
+      }
+    }
+
+    renderChapters() {
+      if (!this.chaptersContainer) return;
+      this.chaptersContainer.innerHTML = '';
+      const total = this.engine.totalSteps;
+      if (!this.currentChapters || this.currentChapters.length === 0 || total <= 1) return;
+
+      this.currentChapters.forEach(ch => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chapter-marker mono';
+        btn.textContent = ch.title;
+        btn.title = `Jump to chapter: ${ch.title} (step ${ch.step + 1})`;
+        const pct = (ch.step / (total - 1)) * 100;
+        btn.style.left = `${pct}%`;
+        if (pct < 10) btn.style.transform = 'translateX(0)';
+        else if (pct > 90) btn.style.transform = 'translateX(-100%)';
+        else btn.style.transform = 'translateX(-50%)';
+
+        btn.onclick = () => this.engine.goToStep(ch.step);
+        this.chaptersContainer.appendChild(btn);
+      });
+      this.updateActiveChapterMarker();
+    }
+
+    updateActiveChapterMarker() {
+      if (!this.chaptersContainer) return;
+      const curr = this.engine.currentStepIndex;
+      const markers = this.chaptersContainer.querySelectorAll('.chapter-marker');
+      if (!this.currentChapters || markers.length !== this.currentChapters.length) return;
+
+      let activeIdx = -1;
+      for (let i = 0; i < this.currentChapters.length; i++) {
+        if (this.currentChapters[i].step <= curr) {
+          activeIdx = i;
+        } else {
+          break;
+        }
+      }
+
+      markers.forEach((m, i) => {
+        m.classList.toggle('active', i === activeIdx);
+      });
     }
 
     showLoadError(msg) {
@@ -1543,7 +2179,14 @@
     updateEmptyState() {
       const hasTrace = this.engine.trace !== null;
       if (this.emptyState) this.emptyState.hidden = hasTrace;
-      if (this.dashboardGrid) this.dashboardGrid.hidden = !hasTrace;
+      
+      if (this.activeMode === 'belady') {
+        if (this.dashboardGrid) this.dashboardGrid.hidden = true;
+        if (this.beladyGrid) this.beladyGrid.hidden = !hasTrace;
+      } else {
+        if (this.dashboardGrid) this.dashboardGrid.hidden = !hasTrace;
+        if (this.beladyGrid) this.beladyGrid.hidden = true;
+      }
 
       // Enable / disable transport controls
       [this.btnSkipStart, this.btnStepBack, this.btnPlayPause, this.btnStepForward, this.btnSkipEnd, this.scrubberRange].forEach(el => {
@@ -1557,16 +2200,29 @@
 
       const h = trace.header;
       if (this.traceName) this.traceName.textContent = this.currentFilename || h.workload || 'trace.jsonl';
-      if (this.metaPolicy) this.metaPolicy.textContent = `policy ${h.policy || 'first-fit'}`;
 
-      if (this.metaConfig) {
-        if (trace.subsystem === 'contiguous') {
-          const memSize = h.config?.memory_size || 1000;
-          this.metaConfig.textContent = `contiguous · ${memSize} units`;
-        } else {
-          const frames = h.config?.frames || 3;
-          const pageSize = h.config?.page_size || 4096;
-          this.metaConfig.textContent = `paging · ${frames} frames · ${pageSize} B pages`;
+      if (this.activeMode === 'compare') {
+        if (this.metaPolicy) this.metaPolicy.textContent = 'compare (first, best, worst)';
+        if (this.metaConfig) this.metaConfig.textContent = `contiguous · ${h.config?.memory_size || 1740} units`;
+      } else if (this.activeMode === 'belady') {
+        if (this.metaPolicy) this.metaPolicy.textContent = 'policy fifo';
+        if (this.metaConfig) this.metaConfig.textContent = 'paging · 3 vs 4 frames · 4096 B pages';
+      } else if (this.activeMode === 'replacement') {
+        if (this.metaPolicy) this.metaPolicy.textContent = `policy ${trace.header.policy || this.activeReplacementPolicy}`;
+        const frames = h.config?.frames || 3;
+        const pageSize = h.config?.page_size || 4096;
+        if (this.metaConfig) this.metaConfig.textContent = `paging · ${frames} frames · ${pageSize} B pages`;
+      } else {
+        if (this.metaPolicy) this.metaPolicy.textContent = `policy ${h.policy || 'first-fit'}`;
+        if (this.metaConfig) {
+          if (trace.subsystem === 'contiguous') {
+            const memSize = h.config?.memory_size || 1000;
+            this.metaConfig.textContent = `contiguous · ${memSize} units`;
+          } else {
+            const frames = h.config?.frames || 3;
+            const pageSize = h.config?.page_size || 4096;
+            this.metaConfig.textContent = `paging · ${frames} frames · ${pageSize} B pages`;
+          }
         }
       }
     }
@@ -1632,27 +2288,71 @@
         }
       }
 
-      // 2. Render Left Panel (Contiguous vs Paging)
-      if (trace.subsystem === 'contiguous') {
-        if (this.headingMemoryPanel) this.headingMemoryPanel.textContent = 'Memory';
-        if (this.contiguousViewport) this.contiguousViewport.hidden = false;
-        if (this.pagingViewport) this.pagingViewport.hidden = true;
-
-        const memSize = step.snapshot?.contiguous?.memory_size || 1000;
-
-        ContiguousRenderer.renderContiguous(
-          this.memoryStrip,
-          step,
-          prevStep,
-          shouldAnimate,
-          (block, el, ev) => this.showBlockPopover(block, el, ev)
-        );
-
-        ContiguousRenderer.renderAddressRuler(this.addressRuler, memSize);
-      } else {
-        if (this.headingMemoryPanel) this.headingMemoryPanel.textContent = 'Frames';
+      // 2. Render Left Panel depending on mode
+      if (this.activeMode === 'compare') {
+        if (this.headingMemoryPanel) this.headingMemoryPanel.textContent = 'Memory Comparison';
+        if (this.compareViewport) this.compareViewport.hidden = false;
         if (this.contiguousViewport) this.contiguousViewport.hidden = true;
+        if (this.pagingViewport) this.pagingViewport.hidden = true;
+        if (this.replacementTabs) this.replacementTabs.hidden = true;
+
+        const polNames = ['First-Fit', 'Best-Fit', 'Worst-Fit'];
+        const narrations = [];
+
+        this.compareTraces.forEach((t, i) => {
+          const s = t.steps[currentIdx];
+          const prev = (this.lastRenderedStep >= 0 && this.lastRenderedStep < t.steps.length)
+            ? t.steps[this.lastRenderedStep]
+            : null;
+
+          ContiguousRenderer.renderContiguous(
+            this.compareStrips[i],
+            s,
+            prev,
+            shouldAnimate,
+            (block, el, ev) => this.showBlockPopover(block, el, ev),
+            this.compareGhosts[i],
+            this.compareBrackets[i]
+          );
+
+          // Outcome label: "placed at 1140" / "fails: fragmentation" in --bad
+          const alloc = s.events.find(e => e.type === 'BlockAllocated');
+          const fail = s.events.find(e => e.type === 'AllocationFailed');
+          const outcomeEl = this.compareOutcomes[i];
+          if (outcomeEl) {
+            if (alloc) {
+              outcomeEl.textContent = `placed at ${alloc.data.start}`;
+              outcomeEl.classList.remove('outcome-bad');
+            } else if (fail) {
+              outcomeEl.textContent = `fails: ${fail.data.cause ? fail.data.cause.toLowerCase() : 'fragmentation'}`;
+              outcomeEl.classList.add('outcome-bad');
+            } else {
+              outcomeEl.textContent = 'ready';
+              outcomeEl.classList.remove('outcome-bad');
+            }
+          }
+
+          narrations.push(`<div class="compare-narration-row"><span class="compare-policy-prefix mono">${polNames[i]}:</span>${UIController.narrate(s.events, s, prev, t)}</div>`);
+        });
+
+        // Ruler only under last strip
+        const memSize = this.compareTraces[2]?.steps[currentIdx]?.snapshot?.contiguous?.memory_size || 1740;
+        ContiguousRenderer.renderAddressRuler(this.compareAddressRuler, memSize);
+
+        // Narrations
+        if (this.compareNarrations) {
+          this.compareNarrations.innerHTML = narrations.join('');
+        }
+
+        // Aligned Comparison Table
+        this.renderCompareTable(currentIdx);
+
+      } else if (this.activeMode === 'replacement') {
+        if (this.headingMemoryPanel) this.headingMemoryPanel.textContent = 'Frames';
+        if (this.replacementTabs) this.replacementTabs.hidden = false;
         if (this.pagingViewport) this.pagingViewport.hidden = false;
+        if (this.contiguousViewport) this.contiguousViewport.hidden = true;
+        if (this.compareViewport) this.compareViewport.hidden = true;
 
         PagingRenderer.renderPaging(
           this.pagingTableWrapper,
@@ -1663,26 +2363,204 @@
           currentIdx,
           shouldAnimate
         );
+
+      } else if (this.activeMode === 'belady') {
+        const tF3 = this.beladyTraces.f3;
+        const tF4 = this.beladyTraces.f4;
+
+        if (tF3) {
+          PagingRenderer.renderPaging(
+            this.beladyF3TableWrapper,
+            this.beladyF3Thead,
+            this.beladyF3Tbody,
+            this.beladyF3Tfoot,
+            tF3,
+            currentIdx,
+            shouldAnimate
+          );
+        }
+
+        if (tF4) {
+          PagingRenderer.renderPaging(
+            this.beladyF4TableWrapper,
+            this.beladyF4Thead,
+            this.beladyF4Tbody,
+            this.beladyF4Tfoot,
+            tF4,
+            currentIdx,
+            shouldAnimate
+          );
+        }
+
+        const countFaults = (t, upToIdx) => {
+          let count = 0;
+          for (let s = 0; s <= upToIdx; s++) {
+            if (t.steps[s]?.events?.some(e => e.type === 'PageFault')) count++;
+          }
+          return count;
+        };
+
+        const totalF3 = tF3?.summary?.metrics?.faults ?? countFaults(tF3, tF3.steps.length - 1);
+        const totalF4 = tF4?.summary?.metrics?.faults ?? countFaults(tF4, tF4.steps.length - 1);
+
+        if (this.beladyTitleF3) this.beladyTitleF3.textContent = `FIFO · 3 frames · ${totalF3} faults`;
+        if (this.beladyTitleF4) this.beladyTitleF4.textContent = `FIFO · 4 frames · ${totalF4} faults`;
+
+      } else {
+        // Single view
+        if (this.compareViewport) this.compareViewport.hidden = true;
+        if (this.replacementTabs) this.replacementTabs.hidden = true;
+
+        if (trace.subsystem === 'contiguous') {
+          if (this.headingMemoryPanel) this.headingMemoryPanel.textContent = 'Memory';
+          if (this.contiguousViewport) this.contiguousViewport.hidden = false;
+          if (this.pagingViewport) this.pagingViewport.hidden = true;
+
+          const memSize = step.snapshot?.contiguous?.memory_size || 1000;
+
+          ContiguousRenderer.renderContiguous(
+            this.memoryStrip,
+            step,
+            prevStep,
+            shouldAnimate,
+            (block, el, ev) => this.showBlockPopover(block, el, ev)
+          );
+
+          ContiguousRenderer.renderAddressRuler(this.addressRuler, memSize);
+        } else {
+          if (this.headingMemoryPanel) this.headingMemoryPanel.textContent = 'Frames';
+          if (this.contiguousViewport) this.contiguousViewport.hidden = true;
+          if (this.pagingViewport) this.pagingViewport.hidden = false;
+
+          PagingRenderer.renderPaging(
+            this.pagingTableWrapper,
+            this.pagingThead,
+            this.pagingTbody,
+            this.pagingTfoot,
+            trace,
+            currentIdx,
+            shouldAnimate
+          );
+        }
       }
 
-      // 3. Step Narration
+      // 3. Step Narration (hidden in compare mode since compare has its own narration block)
       if (this.narrationText) {
-        this.narrationText.innerHTML = UIController.narrate(step.events, step, prevStep, trace);
+        if (this.activeMode === 'compare') {
+          this.narrationText.parentElement.hidden = true;
+        } else {
+          this.narrationText.parentElement.hidden = false;
+          this.narrationText.innerHTML = UIController.narrate(step.events, step, prevStep, trace);
+        }
       }
 
-      // 4. Right Panel 1: Metrics Table & Step Chart
-      if (this.headingMetricsPanel) {
-        this.headingMetricsPanel.textContent = trace.subsystem === 'contiguous' ? 'Fragmentation' : 'Faults';
-      }
-      MetricsRenderer.renderMetrics(this.metricsTbody, step, prevStep, trace);
-      MetricsRenderer.renderStepChart(this.stepChartSvg, trace, currentIdx, (seekIdx) => {
-        this.engine.goToStep(seekIdx);
-      });
+      // 4. Right Panel 1: Metrics Table & Step Chart (in dashboard mode)
+      if (this.activeMode !== 'belady') {
+        if (this.headingMetricsPanel) {
+          this.headingMetricsPanel.textContent = trace.subsystem === 'contiguous' ? 'Fragmentation' : 'Faults';
+        }
+        MetricsRenderer.renderMetrics(this.metricsTbody, step, prevStep, trace);
+        MetricsRenderer.renderStepChart(this.stepChartSvg, trace, currentIdx, (seekIdx) => {
+          this.engine.goToStep(seekIdx);
+        }, this.currentChapters);
 
-      // 5. Right Panel 2: Events List
-      EventRenderer.renderEvents(this.eventsList, step);
+        // 5. Right Panel 2: Events List
+        EventRenderer.renderEvents(this.eventsList, step);
+      }
+
+      // 6. Update Active Chapter Marker
+      this.updateActiveChapterMarker();
 
       this.lastRenderedStep = currentIdx;
+    }
+
+    renderCompareTable(currentIdx) {
+      if (!this.compareTbody || !this.compareTraces || this.compareTraces.length < 3) return;
+      this.compareTbody.innerHTML = '';
+
+      const frags = this.compareTraces.map(t => t.steps[currentIdx]?.snapshot?.contiguous?.frag || {});
+      const failures = this.compareTraces.map(t => {
+        let count = 0;
+        for (let s = 0; s <= currentIdx; s++) {
+          if (t.steps[s]?.events?.some(e => e.type === 'AllocationFailed')) {
+            count++;
+          }
+        }
+        return count;
+      });
+
+      const rowsDef = [
+        {
+          name: 'Free',
+          vals: frags.map(f => f.total_free ?? 0),
+          formatter: v => String(v),
+          bestFn: (vals) => {
+            const max = Math.max(...vals);
+            const min = Math.min(...vals);
+            return max !== min ? max : null;
+          }
+        },
+        {
+          name: 'Largest hole',
+          vals: frags.map(f => f.largest_hole ?? 0),
+          formatter: v => String(v),
+          bestFn: (vals) => {
+            const max = Math.max(...vals);
+            const min = Math.min(...vals);
+            return max !== min ? max : null;
+          }
+        },
+        {
+          name: 'Holes',
+          vals: frags.map(f => f.hole_count ?? 0),
+          formatter: v => String(v),
+          bestFn: (vals) => {
+            const min = Math.min(...vals);
+            const max = Math.max(...vals);
+            return min !== max ? min : null;
+          }
+        },
+        {
+          name: 'External fragmentation',
+          vals: frags.map(f => f.ext_frag ?? 0),
+          formatter: v => `${(v * 100).toFixed(1)}%`,
+          bestFn: (vals) => {
+            const min = Math.min(...vals);
+            const max = Math.max(...vals);
+            return Math.abs(min - max) > 0.0001 ? min : null;
+          }
+        },
+        {
+          name: 'Failures',
+          vals: failures,
+          formatter: v => String(v),
+          bestFn: (vals) => {
+            const min = Math.min(...vals);
+            const max = Math.max(...vals);
+            return min !== max ? min : null;
+          }
+        }
+      ];
+
+      rowsDef.forEach(r => {
+        const tr = document.createElement('tr');
+        const th = document.createElement('td');
+        th.textContent = r.name;
+        tr.appendChild(th);
+
+        const bestVal = r.bestFn(r.vals);
+
+        r.vals.forEach((v) => {
+          const td = document.createElement('td');
+          td.textContent = r.formatter(v);
+          if (bestVal !== null && (bestVal === v || (typeof bestVal === 'number' && Math.abs(bestVal - v) < 0.0001))) {
+            td.className = 'compare-best';
+          }
+          tr.appendChild(td);
+        });
+
+        this.compareTbody.appendChild(tr);
+      });
     }
 
     showBlockPopover(block, el, ev) {
@@ -1955,6 +2833,8 @@
       PagingRenderer,
       MetricsRenderer,
       EventRenderer,
+      BeladyChartRenderer,
+      computeChapters,
       SAMPLE_TRACES,
       MAX_VIEWER_STEPS,
       SUPPORTED_SCHEMA_VERSION
@@ -1962,3 +2842,31 @@
   }
 
 })(typeof window !== 'undefined' ? window : global);
+
+// Self-check for real trace format (run via node viewer/app.js)
+if (typeof module !== 'undefined' && require.main === module) {
+  const assert = require('assert');
+  const realTrace6Lines = [
+    '{"type":"TraceHeader","schema":1,"engine":"0.1.0","git":"b39f3a1","workload":"silberschatz_compact","policy":"first-fit","config":{"memory_size":1740},"trace_level":1}',
+    '{"type":"Snapshot","step":0,"contiguous":{"memory_size":1740,"blocks":[{"start":0,"size":1740,"state":"free"}],"frag":{"total_free":1740,"largest_hole":1740,"hole_count":1,"ext_frag":0.0}}}',
+    '{"seq":1,"step":1,"type":"PlacementDecided","data":{"policy":"first-fit","requested":100,"scanned":1}}',
+    '{"seq":2,"step":1,"type":"BlockAllocated","data":{"pid":"P1","id":"a1","start":0,"size":100,"requested":100}}',
+    '{"type":"Snapshot","step":1,"contiguous":{"memory_size":1740,"blocks":[{"start":0,"size":100,"state":"allocated","pid":"P1","id":"a1"},{"start":100,"size":1640,"state":"free"}],"frag":{"total_free":1640,"largest_hole":1640,"hole_count":1,"ext_frag":0.0}}}',
+    '{"type":"RunSummary","metrics":{"alloc_requests":1,"alloc_failures":0,"ext_frag_final":0.0}}'
+  ].join('\n');
+
+  const { TraceParser, PlaybackEngine } = module.exports;
+  const res = TraceParser.parseTrace(realTrace6Lines);
+  assert.strictEqual(res.ok, true, 'Parsing should succeed');
+  assert.strictEqual(res.trace.totalSteps, 2, 'Should have 2 steps');
+  assert.strictEqual(res.trace.subsystem, 'contiguous', 'Subsystem should be contiguous');
+
+  const engine = new PlaybackEngine();
+  engine.loadTrace(res.trace);
+  assert.strictEqual(engine.totalSteps, 2, 'Engine should load 2 steps');
+  assert.strictEqual(engine.currentStepIndex, 0, 'Initial step should be 0');
+  engine.nextStep();
+  assert.strictEqual(engine.currentStepIndex, 1, 'Next step should advance to 1');
+  console.log('Self-check passed: real-format trace successfully parsed and replayed.');
+}
+

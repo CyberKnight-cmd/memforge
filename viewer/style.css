@@ -988,8 +988,47 @@ body {
   white-space: nowrap;
 }
 
-.scrubber-wrapper {
+.scrubber-area {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  position: relative;
+}
+
+.chapters-container {
+  position: relative;
+  height: 16px;
+  margin: 0 7px;
+  pointer-events: auto;
+}
+
+.chapter-marker {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-family: var(--sans);
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: color var(--dur-ui) var(--ease);
+  line-height: 16px;
+}
+
+.chapter-marker:hover {
+  color: var(--text);
+}
+
+.chapter-marker.active {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.scrubber-wrapper {
+  width: 100%;
   position: relative;
   display: flex;
   align-items: center;
@@ -1212,6 +1251,238 @@ body {
   .paging-cell.cell-slide-in {
     animation: none !important;
   }
+}
+
+/* ==========================================================================
+   Replacement View (Policy Tabs)
+   ========================================================================== */
+.replacement-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 8px;
+}
+
+.btn-tab {
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--mono);
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color var(--dur-ui) var(--ease), border-color var(--dur-ui) var(--ease), background var(--dur-ui) var(--ease);
+}
+
+.btn-tab:hover {
+  color: var(--text);
+}
+
+.btn-tab.active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--ground);
+}
+
+.btn-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Compare View (Three Placement Policies Stacked)
+   ========================================================================== */
+.compare-viewport {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  height: 100%;
+  padding-right: 4px;
+}
+
+.compare-strip-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.compare-strip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+}
+
+.compare-policy {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.compare-outcome {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.compare-outcome.outcome-bad {
+  color: var(--bad);
+}
+
+.compare-stage {
+  position: relative;
+  width: 100%;
+  height: 64px;
+  background: var(--ground);
+  border-radius: 6px;
+  border: 1px solid var(--rule);
+  overflow: visible;
+}
+
+.compare-strip {
+  height: 64px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 6px !important;
+}
+
+.compare-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.compare-narrations {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.compare-narration-row {
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.compare-policy-prefix {
+  font-weight: 600;
+  color: var(--muted);
+  margin-right: 6px;
+}
+
+.compare-table-wrapper {
+  overflow-x: auto;
+  border-radius: 6px;
+  border: 1px solid var(--rule);
+  background: var(--ground);
+}
+
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.compare-table th,
+.compare-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.compare-table tr:last-child td {
+  border-bottom: none;
+}
+
+.compare-table th {
+  text-align: right;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.compare-table th:first-child {
+  text-align: left;
+}
+
+.compare-table td {
+  text-align: right;
+  color: var(--text);
+}
+
+.compare-table td:first-child {
+  text-align: left;
+  color: var(--muted);
+  font-family: var(--sans);
+}
+
+.compare-table td.compare-best {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Belady View (3/5 sweep line chart, 2/5 textbook tables)
+   ========================================================================== */
+.belady-grid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 16px;
+  height: 100%;
+  padding: 16px;
+  overflow: hidden;
+}
+
+.panel-belady-chart,
+.panel-belady-tables {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.belady-chart-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 8px;
+  overflow: hidden;
+}
+
+.belady-chart-svg {
+  width: 100%;
+  height: 100%;
+  max-height: 480px;
+}
+
+.belady-tables-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  height: 100%;
+  padding-right: 4px;
+}
+
+.belady-table-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.belady-table-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.belady-subtable {
+  max-height: 220px;
 }
 
 /* Responsive Stacking below 1024px */

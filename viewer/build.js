@@ -10,16 +10,24 @@ const viewerDir = __dirname;
 const htmlPath = path.join(viewerDir, 'index.html');
 const cssPath = path.join(viewerDir, 'style.css');
 const jsPath = path.join(viewerDir, 'app.js');
+const scenariosPath = path.join(viewerDir, 'scenarios-data.js');
 const standalonePath = path.join(viewerDir, 'standalone.html');
 
 let html = fs.readFileSync(htmlPath, 'utf8');
 const css = fs.readFileSync(cssPath, 'utf8');
 const js = fs.readFileSync(jsPath, 'utf8');
+const scenariosJs = fs.readFileSync(scenariosPath, 'utf8');
 
 // Replace external CSS link with inline <style>
 html = html.replace(
   '<link rel="stylesheet" href="style.css">',
   `<style>\n${css}\n</style>`
+);
+
+// Replace external scenarios data script with inline <script>
+html = html.replace(
+  '<script src="scenarios-data.js"></script>',
+  `<script>\n${scenariosJs}\n</script>`
 );
 
 // Replace external JS script with inline <script>

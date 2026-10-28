@@ -9,4 +9,5 @@ memsim_module(paging DEPS common SOURCES
   policies/fifo.c
   policies/lru.c
   policies/opt.c
+  policies/registry.c
   belady.c)

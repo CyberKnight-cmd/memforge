@@ -135,7 +135,7 @@ def plot_e4(e4_csv, ac4_csv, output_dir):
 
     fig1_pdf = os.path.join(output_dir, "e4_faults_vs_frames.pdf")
     fig1_png = os.path.join(output_dir, "e4_faults_vs_frames.png")
-    fig1.savefig(fig1_pdf, bbox_inches="tight")
+    fig1.savefig(fig1_pdf, bbox_inches="tight", metadata={"CreationDate": None, "ModDate": None})
     fig1.savefig(fig1_png, bbox_inches="tight", dpi=300)
     plt.close(fig1)
 
@@ -221,7 +221,7 @@ def plot_e4(e4_csv, ac4_csv, output_dir):
 
     fig2_pdf = os.path.join(output_dir, "e4_belady_ac4.pdf")
     fig2_png = os.path.join(output_dir, "e4_belady_ac4.png")
-    fig2.savefig(fig2_pdf, bbox_inches="tight")
+    fig2.savefig(fig2_pdf, bbox_inches="tight", metadata={"CreationDate": None, "ModDate": None})
     fig2.savefig(fig2_png, bbox_inches="tight", dpi=300)
     plt.close(fig2)
 

@@ -8,4 +8,4 @@
 | 12 | 151.7 ± 9.7 | 100.7 ± 6.0 | 70.7 ± 4.0 |
 | 16 | 106.7 ± 9.0 | 83.5 ± 5.5 | 53.2 ± 3.2 |
 
-Mean page faults ± 95% confidence interval over 10 seeds, 2,000 references each (git 53039c8; 10 distinct workloads).
+Mean page faults ± 95% confidence interval over 10 seeds, 2,000 references each (git 01ebd01; 10 distinct workloads).

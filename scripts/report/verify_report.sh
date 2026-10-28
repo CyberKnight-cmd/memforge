@@ -361,7 +361,7 @@ with open(md_path, "w", encoding="utf-8") as f:
 
 csv_path = os.path.join(out_dir, "verification.csv")
 with open(csv_path, "w", newline="", encoding="utf-8") as f:
-    writer = csv.writer(f)
+    writer = csv.writer(f, lineterminator="\n")
     writer.writerow(["ID", "Scenario", "What is checked", "Expected", "Observed", "Result"])
     for r in rows:
         writer.writerow(r)

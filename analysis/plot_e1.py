@@ -177,7 +177,7 @@ def plot_e1(csv_path, output_dir):
 
     fig1_pdf = os.path.join(output_dir, "e1_placement.pdf")
     fig1_png = os.path.join(output_dir, "e1_placement.png")
-    fig.savefig(fig1_pdf, bbox_inches="tight")
+    fig.savefig(fig1_pdf, bbox_inches="tight", metadata={"CreationDate": None, "ModDate": None})
     fig.savefig(fig1_png, bbox_inches="tight", dpi=300)
     plt.close(fig)
 
@@ -224,7 +224,7 @@ def plot_e1(csv_path, output_dir):
 
     fig2_pdf = os.path.join(output_dir, "e1_scanned_mean.pdf")
     fig2_png = os.path.join(output_dir, "e1_scanned_mean.png")
-    fig2.savefig(fig2_pdf, bbox_inches="tight")
+    fig2.savefig(fig2_pdf, bbox_inches="tight", metadata={"CreationDate": None, "ModDate": None})
     fig2.savefig(fig2_png, bbox_inches="tight", dpi=300)
     plt.close(fig2)
 

@@ -12,4 +12,4 @@
 | 90% | Best-Fit | 91.4% ± 0.4 | 127.7 ± 7.0 | 5.24 ± 0.15 | 0.473 ± 0.006 |
 | 90% | Worst-Fit | 87.2% ± 0.7 | 192.0 ± 11.1 | 5.19 ± 0.15 | 0.629 ± 0.010 |
 
-Mean ± 95% confidence interval over 10 seeds per cell (git 53039c8; 30 distinct workloads).
+Mean ± 95% confidence interval over 10 seeds per cell (git 01ebd01; 30 distinct workloads).

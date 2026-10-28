@@ -1,0 +1,9 @@
+ID,Scenario,What is checked,Expected,Observed,Result
+AC-1,Placement on five holes (Silberschatz),"Placements of a1, a2, a3, a4 across FF, BF, WF","FF 110,1140,322,fail FRAGMENTATION; BF 830,110,620,1140; WF 1140,110,1352,fail FRAGMENTATION","FF 110,1140,322,fail FRAGMENTATION; BF 830,110,620,1140; WF 1140,110,1352,fail FRAGMENTATION",PASS
+AC-2,Contiguous compaction and allocation retry,Compaction metrics blocks_moved/units_moved and final free block,"blocks_moved 7, units_moved 781; free block start 1207 size 533","blocks_moved 7, units_moved 781; free block start 1207 size 533",PASS
+AC-3,Reference string page replacement,"Page fault counts for FIFO, LRU, OPT with 3 frames","fifo 15, lru 12, opt 9","fifo 15, lru 12, opt 9",PASS
+AC-4,Belady's anomaly frame sweep,"FIFO sweep faults 1..6 and Belady point; LRU/OPT faults at 3,4 frames","fifo faults [12,12,9,10,5,5] with belady point 4; lru 10,8; opt 7,6","fifo faults [12,12,9,10,5,5] with belady point 4; lru 10,8; opt 7,6",PASS
+AC-5,Negative tests: rejections and access violations,Contiguous rejections count and paging violations count,rejections 3; violations 2,rejections 3; violations 2,PASS
+AC-6,Workload trace determinism,Byte-identical traces across two runs for all 6 fixtures,All 6 fixtures byte-identical,6/6 fixtures byte-identical,PASS
+AC-7,Simulation invariants checked under test suite,Invariants hold on every step in test suite (ctest),17/17 passed,17/17 passed,PASS
+AC-8,Comparative policy table output,"Human-readable compare output displays ""fail FRAGMENTATION""","Table contains ""fail FRAGMENTATION""","Table contains ""fail FRAGMENTATION""",PASS

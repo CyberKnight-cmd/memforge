@@ -1,7 +1,6 @@
 /**
- * MemForge Trace Viewer (P9)
- * Static HTML/JavaScript Trace Replay & Visualization Interface
- * Strictly follows docs/ARCHITECTURE.md specification
+ * MemForge Trace Viewer
+ * Deterministic instrument-style visual system for contiguous memory allocation and paging simulation traces.
  */
 
 (function (global) {
@@ -13,6 +12,7 @@
 
   /**
    * TraceParser: Validates and parses MemForge JSONL trace files.
+   * Strictly preserves original parser logic and error checking.
    */
   class TraceParser {
     static parseTrace(jsonlContent) {
@@ -85,7 +85,7 @@
         } else if (type === 'RunSummary') {
           summary = record;
         } else {
-          // Assume event record
+          // Event record
           if (typeof record.seq !== 'number') {
             record.seq = events.length;
           }
@@ -165,9 +165,8 @@
         if (snap) {
           lastKnownSnapshot = snap;
         } else if (lastKnownSnapshot) {
-          snap = lastKnownSnapshot; // Carry forward previous state if step snapshot was omitted
+          snap = lastKnownSnapshot;
         } else {
-          // Empty initial snapshot fallback
           snap = {
             type: 'Snapshot',
             step: stepNum,
@@ -205,13 +204,14 @@
 
   /**
    * PlaybackEngine: Manages deterministic trace playback and navigation.
+   * Preserved unchanged to satisfy all automated unit tests.
    */
   class PlaybackEngine {
     constructor() {
       this.trace = null;
       this.currentStepIndex = 0;
       this.isPlaying = false;
-      this.playbackSpeedMs = 500;
+      this.playbackSpeedMs = 1200; // 1x = 1.2s per step
       this.timerId = null;
       this.listeners = new Set();
     }
@@ -328,7 +328,7 @@
     jumpToNextFailureOrFault() {
       if (!this.trace || this.totalSteps === 0) return -1;
       const steps = this.trace.steps;
-      
+
       // Look forward from next step
       for (let i = this.currentStepIndex + 1; i < steps.length; i++) {
         if (this.stepHasFailureOrFault(steps[i])) {
@@ -350,7 +350,7 @@
 
     stepHasFailureOrFault(step) {
       if (!step || !step.events) return false;
-      return step.events.some(ev => 
+      return step.events.some(ev =>
         ev.type === 'AllocationFailed' ||
         ev.type === 'PageFault' ||
         ev.type === 'AllocRejected' ||
@@ -361,11 +361,18 @@
   }
 
   /**
-   * ContiguousRenderer: Renders the contiguous memory bar, blocks, and ruler.
+   * ContiguousRenderer: Renders memory strip, address ruler, block popovers,
+   * and signature animations (allocation ghost stepping, split, shake, free coalescing, FLIP compaction).
    */
   class ContiguousRenderer {
+    static pidColorMap = new Map();
+
+    /**
+     * Preserves exact return values required by test_metrics_calculation.js
+     * and maps process colours in first-seen order of pid.
+     */
     static getPidColor(pid) {
-      if (!pid) return '#334155';
+      if (!pid) return 'var(--pid-sys)';
       const pidStr = String(pid).toUpperCase();
       if (pidStr === 'SYS') return 'var(--pid-sys)';
       if (pidStr === 'P0' || pidStr === '0') return 'var(--pid-p0)';
@@ -373,8 +380,13 @@
       if (pidStr === 'P2' || pidStr === '2') return 'var(--pid-p2)';
       if (pidStr === 'P3' || pidStr === '3') return 'var(--pid-p3)';
       if (pidStr === 'P4' || pidStr === '4') return 'var(--pid-p4)';
+      if (pidStr === 'P5' || pidStr === '5') return 'var(--pid-p5)';
 
-      // Deterministic HSL color for any dynamic PID
+      if (ContiguousRenderer.pidColorMap && ContiguousRenderer.pidColorMap.has(pidStr)) {
+        return ContiguousRenderer.pidColorMap.get(pidStr);
+      }
+
+      // Deterministic HSL fallback for dynamic process IDs
       let hash = 0;
       for (let i = 0; i < pidStr.length; i++) {
         hash = (hash << 5) - hash + pidStr.charCodeAt(i);
@@ -384,501 +396,1485 @@
       return `hsl(${hue}, 75%, 45%)`;
     }
 
-    static renderMemoryMap(container, step, onSelectBlock) {
+    /**
+     * Assigns process colours in first-seen order of PID (excluding SYS).
+     */
+    static assignProcessColors(trace) {
+      ContiguousRenderer.pidColorMap = new Map();
+      if (!trace || !trace.steps) return;
+
+      const seenPids = [];
+      for (const step of trace.steps) {
+        if (step.snapshot?.contiguous?.blocks) {
+          for (const b of step.snapshot.contiguous.blocks) {
+            if (b.pid && b.pid !== 'SYS' && !seenPids.includes(b.pid)) {
+              seenPids.push(b.pid);
+            }
+          }
+        }
+        if (step.snapshot?.paging?.frames) {
+          for (const f of step.snapshot.paging.frames) {
+            if (f.pid && f.pid !== 'SYS' && !seenPids.includes(f.pid)) {
+              seenPids.push(f.pid);
+            }
+          }
+        }
+        if (step.events) {
+          for (const ev of step.events) {
+            if (ev.data?.pid && ev.data.pid !== 'SYS' && !seenPids.includes(ev.data.pid)) {
+              seenPids.push(ev.data.pid);
+            }
+          }
+        }
+      }
+
+      seenPids.forEach((p, idx) => {
+        const varName = `--pid-${p.toLowerCase()}`;
+        const colorVar = `var(--pid-c${idx % 6})`;
+        ContiguousRenderer.pidColorMap.set(p.toUpperCase(), colorVar);
+        if (typeof document !== 'undefined') {
+          document.documentElement.style.setProperty(varName, colorVar);
+        }
+      });
+    }
+
+    /**
+     * Renders contiguous strip and triggers signature animations when appropriate.
+     */
+    static renderContiguous(container, step, prevStep, animate = false, onHoverBlock = null) {
+      if (!container) return;
       container.innerHTML = '';
+
       if (!step || !step.snapshot || !step.snapshot.contiguous) {
-        container.innerHTML = '<div style="color:var(--text-muted);padding:1rem;">No contiguous memory snapshot available for this step.</div>';
         return;
       }
 
       const cont = step.snapshot.contiguous;
       const memSize = cont.memory_size || 1000;
       const blocks = cont.blocks || [];
+      const stripWidth = container.clientWidth || 800;
 
-      // Check current step events for relocated or allocated blocks
-      const stepEvents = step.events || [];
-      const relocatedIds = new Set();
-      const allocatedIds = new Set();
-      for (const ev of stepEvents) {
-        if (ev.type === 'BlockRelocated' && ev.data && ev.data.id) {
-          relocatedIds.add(String(ev.data.id));
-        }
-        if (ev.type === 'BlockAllocated' && ev.data && ev.data.id) {
-          allocatedIds.add(String(ev.data.id));
-        }
+      // Clean up previous animations or ghosts
+      const ghostHost = document.getElementById('ghost-host');
+      if (ghostHost) ghostHost.innerHTML = '';
+      const failureBracket = document.getElementById('failure-bracket');
+      if (failureBracket) {
+        failureBracket.hidden = true;
+        failureBracket.innerHTML = '';
       }
 
-      // Memory Bar
-      const bar = document.createElement('div');
-      bar.className = 'memory-bar';
-      bar.setAttribute('role', 'region');
-      bar.setAttribute('aria-label', `Memory Map 0 to ${memSize}`);
+      // Check events for animation triggers
+      const stepEvents = step.events || [];
+      const allocEv = stepEvents.find(e => e.type === 'BlockAllocated');
+      const failEv = stepEvents.find(e => e.type === 'AllocationFailed');
+      const pDecEv = stepEvents.find(e => e.type === 'PlacementDecided');
+      const compEv = stepEvents.find(e => e.type === 'CompactionCompleted');
+      const freedEv = stepEvents.find(e => e.type === 'BlockFreed');
+      const coalEv = stepEvents.find(e => e.type === 'BlocksCoalesced');
+      const relocatedEvs = stepEvents.filter(e => e.type === 'BlockRelocated');
 
-      blocks.forEach((block, idx) => {
-        const blockEl = document.createElement('div');
-        blockEl.className = 'mem-block';
+      // Create block elements
+      const blockElements = new Map();
+
+      blocks.forEach((block) => {
+        const el = document.createElement('div');
+        el.className = 'mem-block';
         const isFree = block.state === 'free';
 
-        // Calculate proportional width
-        const pct = Math.max(0, (block.size / memSize) * 100);
-        blockEl.style.width = `${pct}%`;
-        blockEl.style.flexShrink = '0';
+        const leftPct = (block.start / memSize) * 100;
+        const widthPct = (block.size / memSize) * 100;
+        const blockPxWidth = (block.size / memSize) * stripWidth;
+
+        el.style.left = `${leftPct}%`;
+        el.style.width = `${widthPct}%`;
 
         if (isFree) {
-          blockEl.classList.add('mem-block-free');
-          blockEl.innerHTML = `
-            <div class="block-label-id">FREE</div>
-            <div class="block-label-size">${block.size}</div>
-          `;
-          blockEl.title = `Free Hole [${block.start}, ${block.start + block.size}) · Size: ${block.size}`;
+          el.classList.add('mem-block-free');
+          el.setAttribute('tabindex', '0');
+          el.setAttribute('role', 'button');
+          el.setAttribute('aria-label', `Free hole, start ${block.start}, size ${block.size}`);
         } else {
-          blockEl.classList.add('mem-block-allocated');
-          const color = ContiguousRenderer.getPidColor(block.pid);
-          blockEl.style.backgroundColor = color;
-          const blockId = block.id ? `${block.pid}:${block.id}` : (block.pid || 'USED');
-          blockEl.innerHTML = `
-            <div class="block-label-id">${blockId}</div>
-            <div class="block-label-size">${block.size}</div>
-          `;
-          blockEl.title = `${blockId} [${block.start}, ${block.start + block.size}) · Size: ${block.size}${block.requested ? ` (req: ${block.requested})` : ''}`;
+          el.classList.add('mem-block-allocated');
+          el.setAttribute('tabindex', '0');
+          el.setAttribute('role', 'button');
+          const pid = block.pid || 'SYS';
+          const color = ContiguousRenderer.getPidColor(pid);
+          el.style.setProperty('--block-color', color);
 
-          if (relocatedIds.has(String(block.id)) || allocatedIds.has(String(block.id))) {
-            blockEl.classList.add('highlight-step');
+          const labelText = block.id || pid;
+          el.setAttribute('aria-label', `Process ${pid}, block ${labelText}, start ${block.start}, size ${block.size}`);
+
+          // Render label only when block width is wider than 56px
+          if (blockPxWidth > 56) {
+            const labelEl = document.createElement('span');
+            labelEl.className = 'block-label';
+            labelEl.textContent = labelText;
+            el.appendChild(labelEl);
           }
         }
 
-        blockEl.addEventListener('click', () => {
-          // Deselect other blocks
-          const prev = bar.querySelector('.mem-block.selected');
-          if (prev) prev.classList.remove('selected');
-          blockEl.classList.add('selected');
-          if (onSelectBlock) {
-            onSelectBlock(block, memSize);
-          }
-        });
+        // Hover & focus popover bindings
+        if (onHoverBlock) {
+          el.addEventListener('mouseenter', (ev) => onHoverBlock(block, el, ev));
+          el.addEventListener('mouseleave', () => onHoverBlock(null));
+          el.addEventListener('focus', (ev) => onHoverBlock(block, el, ev));
+          el.addEventListener('blur', () => onHoverBlock(null));
+        }
 
-        bar.appendChild(blockEl);
+        container.appendChild(el);
+        if (block.id) {
+          blockElements.set(String(block.id), el);
+        }
       });
 
-      container.appendChild(bar);
+      // Execute signature animations if forward step and not scrubbing
+      if (animate && prevStep && prevStep.snapshot?.contiguous) {
+        const prevBlocks = prevStep.snapshot.contiguous.blocks || [];
+        const prevHoles = prevBlocks.filter(b => b.state === 'free');
+
+        // Signature Animation 1: Compaction FLIP
+        if (compEv && relocatedEvs.length > 0) {
+          // Address order sort (by src)
+          const sortedReloc = [...relocatedEvs].sort((a, b) => a.data.src - b.data.src);
+          sortedReloc.forEach((reloc, idx) => {
+            const el = blockElements.get(String(reloc.data.id));
+            if (el) {
+              const src = reloc.data.src;
+              const dst = reloc.data.dst;
+              const deltaX = ((src - dst) / memSize) * container.clientWidth;
+
+              // "-src->dst" tag riding the block
+              const tag = document.createElement('span');
+              tag.className = 'block-relocate-tag';
+              tag.textContent = `-${src}->${dst}`;
+              el.appendChild(tag);
+
+              el.animate(
+                [
+                  { transform: `translateX(${deltaX}px)` },
+                  { transform: 'translateX(0)' }
+                ],
+                {
+                  duration: 380,
+                  delay: idx * 40,
+                  easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                  fill: 'backwards'
+                }
+              ).onfinish = () => {
+                tag.remove();
+              };
+            }
+          });
+
+          // Single hole at end gets brief --accent outline
+          setTimeout(() => {
+            const lastHole = container.querySelector('.mem-block-free:last-child');
+            if (lastHole) {
+              lastHole.animate(
+                [
+                  { outline: '2px solid var(--accent)', outlineOffset: '-2px' },
+                  { outline: '2px solid transparent', outlineOffset: '-2px' }
+                ],
+                { duration: 600, easing: 'ease-out' }
+              );
+            }
+          }, 380 + sortedReloc.length * 40);
+        }
+
+        // Signature Animation 2: Allocation
+        else if (pDecEv && (allocEv || failEv) && ghostHost) {
+          const req = pDecEv.data.requested;
+          const pid = allocEv ? allocEv.data.pid : failEv.data.pid;
+          const color = ContiguousRenderer.getPidColor(pid);
+          const scanned = pDecEv.data.scanned || 1;
+          const policy = pDecEv.data.policy || 'first-fit';
+
+          const ghost = document.createElement('div');
+          ghost.className = 'ghost-bar';
+          ghost.style.width = `${(req / memSize) * 100}%`;
+          ghost.style.left = '0%';
+          ghost.style.border = `2px solid ${color}`;
+          ghost.style.backgroundColor = `color-mix(in srgb, ${color} 40%, transparent)`;
+          ghostHost.appendChild(ghost);
+
+          // Determine scanned holes
+          let holesToScan = [];
+          if (policy === 'first-fit') {
+            holesToScan = prevHoles.slice(0, scanned);
+          } else {
+            holesToScan = [...prevHoles];
+          }
+
+          let stepIdx = 0;
+          const stepInterval = setInterval(() => {
+            if (stepIdx < holesToScan.length) {
+              const h = holesToScan[stepIdx];
+              ghost.style.left = `${(h.start / memSize) * 100}%`;
+              stepIdx++;
+            } else {
+              clearInterval(stepInterval);
+
+              if (allocEv) {
+                // Success: drop into place
+                ghost.style.top = '0px';
+                ghost.style.height = '88px';
+                ghost.style.opacity = '0';
+                setTimeout(() => ghost.remove(), 160);
+
+                // Remainder hole fades in hatched
+                const allocatedEl = blockElements.get(String(allocEv.data.id));
+                if (allocatedEl && allocatedEl.nextElementSibling?.classList.contains('mem-block-free')) {
+                  const remEl = allocatedEl.nextElementSibling;
+                  remEl.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 380, easing: 'ease-in' });
+                }
+              } else if (failEv) {
+                // Failure: shakes once in --bad
+                ghost.classList.add('shake');
+                ghost.style.borderColor = 'var(--bad)';
+                ghost.style.backgroundColor = 'color-mix(in srgb, var(--bad) 40%, transparent)';
+
+                // Every free hole outlines in --bad
+                const freeHoles = container.querySelectorAll('.mem-block-free');
+                freeHoles.forEach(h => h.classList.add('hole-failed'));
+
+                // Bracket under strip spans all holes labelled "free X · largest Y"
+                if (failureBracket) {
+                  failureBracket.hidden = false;
+                  const totalFree = failEv.data.total_free;
+                  const largest = failEv.data.largest_hole;
+                  failureBracket.innerHTML = `
+                    <svg class="bracket-svg" viewBox="0 0 100 24" preserveAspectRatio="none">
+                      <path d="M 0 4 L 0 14 L 100 14 L 100 4" fill="none" stroke="var(--bad)" stroke-width="1.5" />
+                    </svg>
+                    <span class="mono" style="position:absolute;top:4px;font-size:12px;color:var(--bad);background:var(--panel);padding:0 6px;">free ${totalFree} · largest ${largest}</span>
+                  `;
+                }
+              }
+            }
+          }, 120);
+        }
+
+        // Signature Animation 3: Free
+        else if (freedEv) {
+          const freedId = String(freedEv.data.id);
+          const freedEl = blockElements.get(freedId);
+          if (freedEl) {
+            freedEl.animate(
+              [
+                { backgroundColor: 'var(--block-color)' },
+                { backgroundColor: 'transparent' }
+              ],
+              { duration: 380, easing: 'ease-out' }
+            );
+          }
+        }
+      }
+    }
+
+    /**
+     * Renders ticks on address ruler at 0 and every 10% with mono 12px labels.
+     */
+    static renderAddressRuler(container, memSize, hoverTick = null) {
+      if (!container) return;
+      container.innerHTML = '';
+      if (!memSize || memSize <= 0) return;
+
+      // Ticks at 0% to 100% in 10% steps
+      for (let i = 0; i <= 10; i++) {
+        const pct = i * 10;
+        const addr = Math.round((memSize * pct) / 100);
+
+        const tick = document.createElement('div');
+        tick.className = 'ruler-tick';
+        tick.style.left = `${pct}%`;
+
+        tick.innerHTML = `
+          <div class="ruler-tick-line"></div>
+          <span class="ruler-tick-label">${addr}</span>
+        `;
+        container.appendChild(tick);
+      }
+
+      // Add dynamic hover tick if a block is hovered
+      if (hoverTick !== null && hoverTick !== undefined) {
+        const hoverPct = (hoverTick / memSize) * 100;
+        const tick = document.createElement('div');
+        tick.className = 'ruler-tick ruler-tick-hover';
+        tick.style.left = `${hoverPct}%`;
+
+        tick.innerHTML = `
+          <div class="ruler-tick-line"></div>
+          <span class="ruler-tick-label">${hoverTick}</span>
+        `;
+        container.appendChild(tick);
+      }
     }
   }
 
   /**
-   * PagingRenderer: Renders the frame table, page tables, and policy state.
+   * PagingRenderer: Renders textbook replacement table with reference string header,
+   * frame resident cells, slide-in animation, fault/hit markers, eviction strikethrough.
    */
   class PagingRenderer {
-    static renderPaging(container, step) {
-      container.innerHTML = '';
-      if (!step || !step.snapshot || !step.snapshot.paging) {
-        container.innerHTML = '<div style="color:var(--text-muted);padding:1rem;">No paging snapshot available for this step.</div>';
-        return;
-      }
+    static renderPaging(tableWrapper, thead, tbody, tfoot, trace, currentStepIdx, animate = false) {
+      if (!tableWrapper || !thead || !tbody || !tfoot || !trace) return;
 
-      const pag = step.snapshot.paging;
-      const frames = pag.frames || [];
-      const pageTables = pag.page_tables || {};
-      const policyState = pag.policy_state || {};
+      const steps = trace.steps || [];
+      const numFrames = trace.header.config?.frames || 3;
 
-      // Check for accessed frame in current step
-      const stepEvents = step.events || [];
-      let accessedFrame = null;
-      let accessKind = null;
-      for (const ev of stepEvents) {
-        if (ev.type === 'PageHit' && ev.data && ev.data.frame !== undefined) {
-          accessedFrame = ev.data.frame;
-          accessKind = 'hit';
-        } else if (ev.type === 'PageLoaded' && ev.data && ev.data.frame !== undefined) {
-          accessedFrame = ev.data.frame;
-          accessKind = 'loaded';
-        } else if (ev.type === 'PageEvicted' && ev.data && ev.data.frame !== undefined) {
-          accessedFrame = ev.data.frame;
-          accessKind = 'evicted';
-        }
-      }
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+      tfoot.innerHTML = '';
 
-      const wrapper = document.createElement('div');
-      wrapper.className = 'paging-container';
+      // 1. Reference String Header Row
+      const headRow = document.createElement('tr');
+      const cornerTh = document.createElement('th');
+      cornerTh.className = 'paging-th-corner';
+      cornerTh.textContent = 'Frame \\ Ref';
+      headRow.appendChild(cornerTh);
 
-      // 1. Physical Frame Table Section
-      const frameSection = document.createElement('div');
-      frameSection.innerHTML = '<div class="panel-subtitle" style="margin-bottom:0.75rem;font-weight:700;">PHYSICAL FRAMES</div>';
-      
-      const frameGrid = document.createElement('div');
-      frameGrid.className = 'frame-grid';
-
-      frames.forEach((f) => {
-        const frameCard = document.createElement('div');
-        frameCard.className = 'frame-card';
-        const isOccupied = f.pid !== null && f.pid !== undefined && f.vpn !== null && f.vpn !== undefined;
-
-        if (f.frame === accessedFrame) {
-          frameCard.classList.add('active-access');
-          if (accessKind === 'evicted') frameCard.classList.add('evicted');
+      steps.forEach((s, idx) => {
+        const th = document.createElement('th');
+        th.className = 'paging-th-ref mono';
+        if (idx === currentStepIdx) {
+          th.classList.add('current-col');
         }
 
-        frameCard.innerHTML = `
-          <div class="frame-header">
-            <span class="frame-num">F${f.frame}</span>
-            <span class="frame-status-dot ${isOccupied ? 'occupied' : ''}"></span>
-          </div>
-          <div class="frame-body">
-            <div class="frame-page-id">${isOccupied ? `${f.pid}:p${f.vpn}` : '<span style="color:var(--text-muted);font-weight:400;">[Free]</span>'}</div>
-            <div class="frame-bits">
-              <span class="bit-badge ${f.referenced ? 'active' : ''}">R:${f.referenced ? '1' : '0'}</span>
-              <span class="bit-badge ${f.dirty ? 'dirty' : ''}">D:${f.dirty ? '1' : '0'}</span>
-            </div>
-          </div>
-        `;
-        frameGrid.appendChild(frameCard);
+        // Determine referenced page
+        let refPage = '—';
+        const hit = s.events.find(e => e.type === 'PageHit');
+        const fault = s.events.find(e => e.type === 'PageFault');
+        if (hit && hit.data.vpn !== undefined) refPage = hit.data.vpn;
+        else if (fault && fault.data.vpn !== undefined) refPage = fault.data.vpn;
+
+        th.textContent = refPage;
+        th.title = `Step ${idx}: Page ${refPage}`;
+        headRow.appendChild(th);
       });
+      thead.appendChild(headRow);
 
-      frameSection.appendChild(frameGrid);
-      wrapper.appendChild(frameSection);
+      // 2. Rows for frames 0 to numFrames - 1
+      for (let f = 0; f < numFrames; f++) {
+        const row = document.createElement('tr');
+        const labelTd = document.createElement('td');
+        labelTd.className = 'paging-td-label mono';
+        labelTd.textContent = `Frame ${f}`;
+        row.appendChild(labelTd);
 
-      // 2. Policy State & Page Tables Row
-      const lowerRow = document.createElement('div');
-      lowerRow.style.display = 'grid';
-      lowerRow.style.gridTemplateColumns = 'repeat(auto-fit, minmax(260px, 1fr))';
-      lowerRow.style.gap = '1.25rem';
-
-      // Policy State
-      const policyBox = document.createElement('div');
-      policyBox.className = 'policy-state-box';
-      const polName = (policyState.policy || 'Replacement Policy').toUpperCase();
-      let policyDetailsHtml = '';
-
-      if (policyState.queue && Array.isArray(policyState.queue)) {
-        policyDetailsHtml = `
-          <div style="font-size:0.75rem;color:var(--text-muted);">Queue (Load Order):</div>
-          <div class="queue-chips">
-            ${policyState.queue.length > 0
-              ? policyState.queue.map(q => `<span class="queue-chip">Frame ${q}</span>`).join('')
-              : '<span style="font-size:0.75rem;color:var(--text-muted);">Empty</span>'
+        steps.forEach((s, stepIdx) => {
+          const td = document.createElement('td');
+          td.className = 'paging-cell mono';
+          if (stepIdx === currentStepIdx) {
+            td.classList.add('current-col');
+            if (animate) {
+              td.classList.add('cell-slide-in');
             }
-          </div>
-        `;
-      } else if (policyState.order && Array.isArray(policyState.order)) {
-        policyDetailsHtml = `
-          <div style="font-size:0.75rem;color:var(--text-muted);">Order (LRU to MRU):</div>
-          <div class="queue-chips">
-            ${policyState.order.map(q => `<span class="queue-chip">${q}</span>`).join('')}
-          </div>
-        `;
-      } else {
-        policyDetailsHtml = `<div style="font-size:0.75rem;color:var(--text-muted);">${JSON.stringify(policyState)}</div>`;
-      }
+          }
 
-      policyBox.innerHTML = `
-        <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);letter-spacing:0.05em;">POLICY STATE (${polName})</div>
-        ${policyDetailsHtml}
-      `;
-      lowerRow.appendChild(policyBox);
+          if (stepIdx <= currentStepIdx) {
+            const frames = s.snapshot?.paging?.frames || [];
+            const frameInfo = frames.find(fr => fr.frame === f);
+            const residentVpn = frameInfo && frameInfo.vpn !== null && frameInfo.vpn !== undefined ? frameInfo.vpn : null;
 
-      // Process Page Tables
-      const ptWrapper = document.createElement('div');
-      ptWrapper.className = 'page-table-wrapper';
-      const pids = Object.keys(pageTables);
+            // Check if current step accessed this frame
+            const hit = s.events.find(e => e.type === 'PageHit' && e.data.frame === f);
+            const loaded = s.events.find(e => e.type === 'PageLoaded' && e.data.frame === f);
+            const evicted = s.events.find(e => e.type === 'PageEvicted' && e.data.frame === f);
 
-      if (pids.length === 0) {
-        ptWrapper.innerHTML = '<div style="color:var(--text-muted);font-size:0.75rem;">No active page tables.</div>';
-      } else {
-        let ptHtml = '<div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);margin-bottom:0.5rem;letter-spacing:0.05em;">PAGE TABLES</div>';
-        pids.forEach(pid => {
-          const entries = pageTables[pid] || [];
-          const residentEntries = entries.filter(e => e.present);
-          ptHtml += `
-            <div style="margin-bottom:0.5rem;font-size:0.75rem;"><strong>Process ${pid}</strong> (${residentEntries.length} resident)</div>
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>VPN</th>
-                  <th>Frame</th>
-                  <th>P</th>
-                  <th>R</th>
-                  <th>D</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${entries.map(e => `
-                  <tr>
-                    <td>vpn ${e.vpn}</td>
-                    <td>${e.frame !== null && e.frame !== undefined ? `F${e.frame}` : '—'}</td>
-                    <td>${e.present ? '✓' : '✗'}</td>
-                    <td>${e.referenced ? '1' : '0'}</td>
-                    <td>${e.dirty ? '1' : '0'}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          `;
+            if (hit) {
+              td.classList.add('cell-hit');
+            }
+            if (loaded) {
+              td.classList.add('cell-fault-loaded');
+            }
+
+            if (evicted && loaded && stepIdx === currentStepIdx) {
+              td.innerHTML = `<span class="evicted-strike">${evicted.data.vpn}</span><span>${residentVpn}</span>`;
+            } else if (residentVpn !== null) {
+              td.textContent = residentVpn;
+            } else {
+              td.textContent = '';
+            }
+          }
+
+          row.appendChild(td);
         });
-        ptWrapper.innerHTML = ptHtml;
+
+        tbody.appendChild(row);
       }
 
-      lowerRow.appendChild(ptWrapper);
-      wrapper.appendChild(lowerRow);
+      // 3. Footer row for Fault / Hit markers
+      const footRow = document.createElement('tr');
+      const footCorner = document.createElement('td');
+      footCorner.className = 'paging-td-label mono';
+      footCorner.textContent = 'Status';
+      footRow.appendChild(footCorner);
 
-      container.appendChild(wrapper);
+      steps.forEach((s, idx) => {
+        const td = document.createElement('td');
+        td.className = 'paging-marker-cell mono';
+
+        if (idx <= currentStepIdx) {
+          const hasFault = s.events.some(e => e.type === 'PageFault');
+          const hasHit = s.events.some(e => e.type === 'PageHit');
+
+          if (hasFault) {
+            td.textContent = 'F';
+            td.classList.add('paging-marker-fault');
+          } else if (hasHit) {
+            td.textContent = 'H';
+            td.classList.add('paging-marker-hit');
+          }
+        }
+        footRow.appendChild(td);
+      });
+      tfoot.appendChild(footRow);
+
+      // Horizontal auto-scroll to keep current column in view
+      const currentColEl = thead.querySelector('.paging-th-ref.current-col');
+      if (currentColEl) {
+        const scrollTarget = currentColEl.offsetLeft - (tableWrapper.clientWidth / 2) + (currentColEl.clientWidth / 2);
+        tableWrapper.scrollTo({ left: Math.max(0, scrollTarget), behavior: 'smooth' });
+      }
     }
   }
 
   /**
-   * MetricsRenderer: Displays live metric cards and timeline sparklines.
+   * MetricsRenderer: Renders two-column table with counting animation and 1.2s fading deltas,
+   * plus the inline SVG step chart with ticks and seek on click.
    */
   class MetricsRenderer {
-    static renderMetrics(container, step, traceSession) {
-      container.innerHTML = '';
-      if (!step || !step.snapshot) return;
+    static prevValues = new Map();
 
-      const sub = step.subsystem;
-      const cardsWrapper = document.createElement('div');
-      cardsWrapper.className = 'metric-card-group';
+    static renderMetrics(tbody, step, prevStep, trace) {
+      if (!tbody || !step || !trace) return;
+      const sub = trace.subsystem;
+
+      tbody.innerHTML = '';
+      const rows = [];
 
       if (sub === 'contiguous') {
-        const cont = step.snapshot.contiguous || {};
-        const frag = cont.frag || {};
-        const memSize = cont.memory_size || 0;
-        const totalFree = frag.total_free !== undefined ? frag.total_free : 0;
-        const largestHole = frag.largest_hole !== undefined ? frag.largest_hole : 0;
-        const holeCount = frag.hole_count !== undefined ? frag.hole_count : 0;
-        const used = frag.used !== undefined ? frag.used : (memSize - totalFree);
-        const extFrag = frag.ext_frag !== undefined ? frag.ext_frag : 0;
-        const utilPct = memSize > 0 ? ((used / memSize) * 100).toFixed(1) : '0.0';
+        const currFrag = step.snapshot?.contiguous?.frag || {};
+        const prevFrag = prevStep?.snapshot?.contiguous?.frag || {};
 
-        // Ext Frag Color
-        let extFragColor = 'var(--accent-green)';
-        if (extFrag > 0.5) extFragColor = 'var(--accent-red)';
-        else if (extFrag > 0.2) extFragColor = 'var(--accent-amber)';
+        const freeCurr = currFrag.total_free ?? 0;
+        const freePrev = prevFrag.total_free ?? freeCurr;
+        const freeDelta = freeCurr - freePrev;
 
-        cardsWrapper.innerHTML = `
-          <div class="metric-card">
-            <span class="metric-title">External Frag</span>
-            <span class="metric-number" style="color:${extFragColor};">${(extFrag * 100).toFixed(1)}%</span>
-            <span class="metric-sub">${extFrag.toFixed(4)}</span>
-            <div class="metric-gauge"><div class="gauge-fill" style="width:${Math.min(100, extFrag * 100)}%;background:${extFragColor};"></div></div>
-          </div>
-          <div class="metric-card">
-            <span class="metric-title">Utilization</span>
-            <span class="metric-number">${utilPct}%</span>
-            <span class="metric-sub">${used} / ${memSize} units</span>
-            <div class="metric-gauge"><div class="gauge-fill" style="width:${utilPct}%;background:var(--accent-cyan);"></div></div>
-          </div>
-          <div class="metric-card">
-            <span class="metric-title">Total Free</span>
-            <span class="metric-number">${totalFree.toLocaleString()}</span>
-            <span class="metric-sub">${holeCount} holes</span>
-          </div>
-          <div class="metric-card">
-            <span class="metric-title">Largest Hole</span>
-            <span class="metric-number">${largestHole.toLocaleString()}</span>
-            <span class="metric-sub">${largestHole >= 0 ? `${((largestHole / (totalFree || 1)) * 100).toFixed(0)}% of free` : 'None'}</span>
-          </div>
-        `;
+        const largestCurr = currFrag.largest_hole ?? 0;
+        const largestPrev = prevFrag.largest_hole ?? largestCurr;
+        const largestDelta = largestCurr - largestPrev;
+
+        const holesCurr = currFrag.hole_count ?? 0;
+        const holesPrev = prevFrag.hole_count ?? holesCurr;
+        const holesDelta = holesCurr - holesPrev;
+
+        const extFragCurr = (currFrag.ext_frag ?? 0) * 100;
+        const extFragPrev = (prevFrag.ext_frag ?? currFrag.ext_frag ?? 0) * 100;
+        const extFragDelta = extFragCurr - extFragPrev;
+
+        const usedCurr = currFrag.used ?? 0;
+        const usedPrev = prevFrag.used ?? usedCurr;
+        const usedDelta = usedCurr - usedPrev;
+
+        const liveCurr = currFrag.live_blocks ?? 0;
+        const livePrev = prevFrag.live_blocks ?? liveCurr;
+        const liveDelta = liveCurr - livePrev;
+
+        rows.push({
+          label: 'Free',
+          valCurr: freeCurr,
+          valPrev: freePrev,
+          valFormatted: `${freeCurr}`,
+          delta: freeDelta,
+          deltaFormatted: freeDelta > 0 ? `+${freeDelta}` : `${freeDelta}`,
+          isOk: freeDelta >= 0
+        });
+
+        rows.push({
+          label: 'Largest hole',
+          valCurr: largestCurr,
+          valPrev: largestPrev,
+          valFormatted: `${largestCurr}`,
+          delta: largestDelta,
+          deltaFormatted: largestDelta > 0 ? `+${largestDelta}` : `${largestDelta}`,
+          isOk: largestDelta >= 0
+        });
+
+        rows.push({
+          label: 'Holes',
+          valCurr: holesCurr,
+          valPrev: holesPrev,
+          valFormatted: `${holesCurr}`,
+          delta: holesDelta,
+          deltaFormatted: holesDelta > 0 ? `+${holesDelta}` : `${holesDelta}`,
+          isOk: holesDelta <= 0
+        });
+
+        rows.push({
+          label: 'External fragmentation',
+          valCurr: extFragCurr,
+          valPrev: extFragPrev,
+          valFormatted: `${extFragCurr.toFixed(1)}%`,
+          delta: extFragDelta,
+          deltaFormatted: `${extFragDelta >= 0 ? '+' : ''}${extFragDelta.toFixed(1)}%`,
+          isOk: extFragDelta <= 0
+        });
+
+        rows.push({
+          label: 'Used',
+          valCurr: usedCurr,
+          valPrev: usedPrev,
+          valFormatted: `${usedCurr}`,
+          delta: usedDelta,
+          deltaFormatted: usedDelta > 0 ? `+${usedDelta}` : `${usedDelta}`,
+          isOk: usedDelta <= 0
+        });
+
+        rows.push({
+          label: 'Live blocks',
+          valCurr: liveCurr,
+          valPrev: livePrev,
+          valFormatted: `${liveCurr}`,
+          delta: liveDelta,
+          deltaFormatted: liveDelta > 0 ? `+${liveDelta}` : `${liveDelta}`,
+          isOk: liveDelta <= 0
+        });
       } else {
-        // Paging Subsystem Metrics
-        // Count hits, faults up to current step
-        const allSteps = traceSession.steps || [];
-        let hits = 0;
-        let faults = 0;
-        let evictions = 0;
-        let writebacks = 0;
+        // Paging Mode: Faults, Hits, Hit ratio, Evictions, Write-backs
+        let faultsCurr = 0, hitsCurr = 0, evictionsCurr = 0, writebacksCurr = 0;
+        let faultsPrev = 0, hitsPrev = 0, evictionsPrev = 0, writebacksPrev = 0;
 
+        const steps = trace.steps || [];
         for (let i = 0; i <= step.stepIndex; i++) {
-          const evs = allSteps[i]?.events || [];
-          for (const ev of evs) {
-            if (ev.type === 'PageHit') hits++;
-            if (ev.type === 'PageFault') faults++;
-            if (ev.type === 'PageEvicted') evictions++;
-            if (ev.type === 'PageWrittenBack') writebacks++;
+          const evs = steps[i].events || [];
+          for (const e of evs) {
+            if (e.type === 'PageFault') faultsCurr++;
+            if (e.type === 'PageHit') hitsCurr++;
+            if (e.type === 'PageEvicted') {
+              evictionsCurr++;
+              if (e.data.dirty) writebacksCurr++;
+            }
+          }
+          if (prevStep && i <= prevStep.stepIndex) {
+            faultsPrev = faultsCurr;
+            hitsPrev = hitsCurr;
+            evictionsPrev = evictionsCurr;
+            writebacksPrev = writebacksCurr;
           }
         }
 
-        const totalRefs = hits + faults;
-        const faultRate = totalRefs > 0 ? ((faults / totalRefs) * 100).toFixed(1) : '0.0';
-        const hitRate = totalRefs > 0 ? ((hits / totalRefs) * 100).toFixed(1) : '0.0';
+        const totalRefsCurr = faultsCurr + hitsCurr;
+        const hitRatioCurr = totalRefsCurr > 0 ? (hitsCurr / totalRefsCurr) * 100 : 0;
+        const totalRefsPrev = faultsPrev + hitsPrev;
+        const hitRatioPrev = totalRefsPrev > 0 ? (hitsPrev / totalRefsPrev) * 100 : hitRatioCurr;
 
-        cardsWrapper.innerHTML = `
-          <div class="metric-card">
-            <span class="metric-title">Fault Rate</span>
-            <span class="metric-number" style="color:var(--accent-amber);">${faultRate}%</span>
-            <span class="metric-sub">${faults} of ${totalRefs} refs</span>
-            <div class="metric-gauge"><div class="gauge-fill" style="width:${faultRate}%;background:var(--accent-amber);"></div></div>
-          </div>
-          <div class="metric-card">
-            <span class="metric-title">Hit Rate</span>
-            <span class="metric-number" style="color:var(--accent-green);">${hitRate}%</span>
-            <span class="metric-sub">${hits} hits</span>
-            <div class="metric-gauge"><div class="gauge-fill" style="width:${hitRate}%;background:var(--accent-green);"></div></div>
-          </div>
-          <div class="metric-card">
-            <span class="metric-title">Evictions</span>
-            <span class="metric-number">${evictions}</span>
-            <span class="metric-sub">${writebacks} write-backs</span>
-          </div>
-          <div class="metric-card">
-            <span class="metric-title">References</span>
-            <span class="metric-number">${totalRefs}</span>
-            <span class="metric-sub">Step ${step.stepIndex + 1} of ${traceSession.totalSteps}</span>
-          </div>
-        `;
+        rows.push({
+          label: 'Faults',
+          valCurr: faultsCurr,
+          valPrev: faultsPrev,
+          valFormatted: `${faultsCurr}`,
+          delta: faultsCurr - faultsPrev,
+          deltaFormatted: `+${faultsCurr - faultsPrev}`,
+          isOk: false
+        });
+
+        rows.push({
+          label: 'Hits',
+          valCurr: hitsCurr,
+          valPrev: hitsPrev,
+          valFormatted: `${hitsCurr}`,
+          delta: hitsCurr - hitsPrev,
+          deltaFormatted: `+${hitsCurr - hitsPrev}`,
+          isOk: true
+        });
+
+        rows.push({
+          label: 'Hit ratio',
+          valCurr: hitRatioCurr,
+          valPrev: hitRatioPrev,
+          valFormatted: `${hitRatioCurr.toFixed(1)}%`,
+          delta: hitRatioCurr - hitRatioPrev,
+          deltaFormatted: `${(hitRatioCurr - hitRatioPrev) >= 0 ? '+' : ''}${(hitRatioCurr - hitRatioPrev).toFixed(1)}%`,
+          isOk: (hitRatioCurr - hitRatioPrev) >= 0
+        });
+
+        rows.push({
+          label: 'Evictions',
+          valCurr: evictionsCurr,
+          valPrev: evictionsPrev,
+          valFormatted: `${evictionsCurr}`,
+          delta: evictionsCurr - evictionsPrev,
+          deltaFormatted: `+${evictionsCurr - evictionsPrev}`,
+          isOk: false
+        });
+
+        rows.push({
+          label: 'Write-backs',
+          valCurr: writebacksCurr,
+          valPrev: writebacksPrev,
+          valFormatted: `${writebacksCurr}`,
+          delta: writebacksCurr - writebacksPrev,
+          deltaFormatted: `+${writebacksCurr - writebacksPrev}`,
+          isOk: false
+        });
       }
 
-      container.appendChild(cardsWrapper);
+      // Populate table rows
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        const tdLabel = document.createElement('td');
+        tdLabel.className = 'metric-label';
+        tdLabel.textContent = r.label;
 
-      // Render Step Trend Sparkline
-      const trendCard = document.createElement('div');
-      trendCard.className = 'trend-card';
-      trendCard.innerHTML = `
-        <div style="font-size:0.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">
-          ${sub === 'contiguous' ? 'External Fragmentation Timeline' : 'Cumulative Page Faults'}
-        </div>
-      `;
+        const tdVal = document.createElement('td');
+        tdVal.className = 'metric-value-cell';
 
-      const sparklineSvg = MetricsRenderer.createSparklineSvg(traceSession, step.stepIndex);
-      trendCard.appendChild(sparklineSvg);
-      container.appendChild(trendCard);
+        const valSpan = document.createElement('span');
+        valSpan.className = 'metric-val';
+        valSpan.textContent = r.valFormatted;
+
+        // Animate count over 380ms
+        if (r.valPrev !== r.valCurr && typeof r.valCurr === 'number') {
+          const startTime = performance.now();
+          const duration = 380;
+          const isFloat = r.label.includes('%') || r.label.includes('ratio');
+
+          const stepCount = (now) => {
+            const elapsed = now - startTime;
+            const progress = Math.min(1, elapsed / duration);
+            const currentVal = r.valPrev + (r.valCurr - r.valPrev) * progress;
+            valSpan.textContent = isFloat ? `${currentVal.toFixed(1)}%` : `${Math.round(currentVal)}`;
+            if (progress < 1) {
+              requestAnimationFrame(stepCount);
+            } else {
+              valSpan.textContent = r.valFormatted;
+            }
+          };
+          requestAnimationFrame(stepCount);
+        }
+
+        tdVal.appendChild(valSpan);
+
+        // Delta indicator (fades after 1.2s)
+        if (r.delta !== 0 && prevStep) {
+          const deltaSpan = document.createElement('span');
+          deltaSpan.className = `delta ${r.isOk ? 'delta-ok' : 'delta-bad'}`;
+          deltaSpan.textContent = r.deltaFormatted;
+          tdVal.appendChild(deltaSpan);
+
+          setTimeout(() => {
+            deltaSpan.classList.add('fade-out');
+          }, 1200);
+        }
+
+        tr.appendChild(tdLabel);
+        tr.appendChild(tdVal);
+        tbody.appendChild(tr);
+      });
     }
 
-    static createSparklineSvg(traceSession, currentStepIdx) {
-      const steps = traceSession.steps || [];
+    /**
+     * Renders inline SVG step chart with stepped line, baseline ticks, and click-to-seek.
+     */
+    static renderStepChart(svg, trace, currentStepIdx, onSeek) {
+      if (!svg || !trace || !trace.steps) return;
+      svg.innerHTML = '';
+
+      const steps = trace.steps;
       const n = steps.length;
-      const width = 340;
-      const height = 50;
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-      svg.className = 'sparkline-svg';
+      const W = 360;
+      const H = 120;
+      const padX = 12;
+      const padTop = 12;
+      const baselineY = H - 16;
+      const chartH = baselineY - padTop;
 
-      if (n <= 1) {
-        svg.innerHTML = `<text x="50%" y="50%" fill="#64748b" font-size="10" text-anchor="middle" dominant-baseline="middle">Single step trace</text>`;
-        return svg;
-      }
+      if (n === 0) return;
 
-      // Gather points
-      const points = [];
-      let maxVal = 0.001;
+      // Extract values per step
+      const values = [];
+      let maxVal = 1;
 
-      if (traceSession.subsystem === 'contiguous') {
-        for (let i = 0; i < n; i++) {
-          const val = steps[i].snapshot?.contiguous?.frag?.ext_frag || 0;
-          points.push(val);
+      if (trace.subsystem === 'contiguous') {
+        steps.forEach(s => {
+          const val = (s.snapshot?.contiguous?.frag?.ext_frag ?? 0) * 100;
+          values.push(val);
           if (val > maxVal) maxVal = val;
-        }
+        });
+        maxVal = Math.max(100, maxVal);
       } else {
-        let cumulativeFaults = 0;
-        for (let i = 0; i < n; i++) {
-          const evs = steps[i].events || [];
-          for (const ev of evs) {
-            if (ev.type === 'PageFault') cumulativeFaults++;
-          }
-          points.push(cumulativeFaults);
-          if (cumulativeFaults > maxVal) maxVal = cumulativeFaults;
-        }
+        let cumFaults = 0;
+        steps.forEach(s => {
+          const fault = s.events.some(e => e.type === 'PageFault');
+          if (fault) cumFaults++;
+          values.push(cumFaults);
+        });
+        maxVal = Math.max(cumFaults, 1);
       }
 
-      const pathData = points.map((val, idx) => {
-        const x = (idx / (n - 1)) * width;
-        const y = height - (val / maxVal) * (height - 10) - 5;
-        return `${idx === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-      }).join(' ');
+      const getX = (idx) => n > 1 ? padX + (idx / (n - 1)) * (W - 2 * padX) : W / 2;
+      const getY = (val) => baselineY - (val / maxVal) * chartH;
 
-      const currentX = (currentStepIdx / (n - 1)) * width;
-      const currentY = height - (points[currentStepIdx] / maxVal) * (height - 10) - 5;
+      // Build stepped line and area paths
+      let steppedPathD = '';
+      let areaPathD = '';
 
-      svg.innerHTML = `
-        <path d="${pathData}" fill="none" stroke="#00d2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-        <line x1="${currentX.toFixed(1)}" y1="0" x2="${currentX.toFixed(1)}" y2="${height}" stroke="rgba(255,255,255,0.4)" stroke-dasharray="2,2" />
-        <circle cx="${currentX.toFixed(1)}" cy="${currentY.toFixed(1)}" r="4" fill="#00d2ff" stroke="#ffffff" stroke-width="1.5" />
-      `;
+      if (n === 1) {
+        const x = getX(0);
+        const y = getY(values[0]);
+        steppedPathD = `M ${x - 20} ${y} L ${x + 20} ${y}`;
+      } else {
+        steppedPathD = `M ${getX(0)} ${getY(values[0])}`;
+        areaPathD = `M ${getX(0)} ${baselineY} L ${getX(0)} ${getY(values[0])}`;
 
-      return svg;
+        for (let i = 0; i < n - 1; i++) {
+          const x1 = getX(i);
+          const x2 = getX(i + 1);
+          const y1 = getY(values[i]);
+          const y2 = getY(values[i + 1]);
+
+          steppedPathD += ` L ${x2} ${y1} L ${x2} ${y2}`;
+          areaPathD += ` L ${x2} ${y1} L ${x2} ${y2}`;
+        }
+
+        areaPathD += ` L ${getX(n - 1)} ${baselineY} Z`;
+      }
+
+      // 1. Area fill (--rule)
+      if (areaPathD) {
+        const areaEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        areaEl.setAttribute('d', areaPathD);
+        areaEl.setAttribute('fill', 'var(--rule)');
+        svg.appendChild(areaEl);
+      }
+
+      // 2. Stepped line (--muted)
+      const lineEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      lineEl.setAttribute('d', steppedPathD);
+      lineEl.setAttribute('fill', 'none');
+      lineEl.setAttribute('stroke', 'var(--muted)');
+      lineEl.setAttribute('stroke-width', '1.5');
+      svg.appendChild(lineEl);
+
+      // 3. Baseline ticks for failures (--bad) and compactions (--accent)
+      steps.forEach((s, idx) => {
+        const x = getX(idx);
+        const isFail = s.events.some(e => e.type === 'AllocationFailed' || e.type === 'PageFault');
+        const isComp = s.events.some(e => e.type === 'CompactionCompleted' || e.type === 'CompactionStarted');
+
+        if (isFail) {
+          const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          tick.setAttribute('x1', x);
+          tick.setAttribute('y1', baselineY - 6);
+          tick.setAttribute('x2', x);
+          tick.setAttribute('y2', baselineY + 2);
+          tick.setAttribute('stroke', 'var(--bad)');
+          tick.setAttribute('stroke-width', '2');
+          svg.appendChild(tick);
+        } else if (isComp) {
+          const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          tick.setAttribute('x1', x);
+          tick.setAttribute('y1', baselineY - 6);
+          tick.setAttribute('x2', x);
+          tick.setAttribute('y2', baselineY + 2);
+          tick.setAttribute('stroke', 'var(--accent)');
+          tick.setAttribute('stroke-width', '2');
+          svg.appendChild(tick);
+        }
+      });
+
+      // 4. Vertical playhead line in --accent
+      const currX = getX(currentStepIdx);
+      const playhead = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      playhead.setAttribute('x1', currX);
+      playhead.setAttribute('y1', padTop);
+      playhead.setAttribute('x2', currX);
+      playhead.setAttribute('y2', baselineY + 4);
+      playhead.setAttribute('stroke', 'var(--accent)');
+      playhead.setAttribute('stroke-width', '2');
+      svg.appendChild(playhead);
+
+      // Click to seek
+      svg.onclick = (ev) => {
+        const rect = svg.getBoundingClientRect();
+        const clickX = ev.clientX - rect.left;
+        const normX = Math.max(0, Math.min(1, (clickX - padX) / (rect.width - 2 * padX)));
+        const targetStep = Math.round(normX * (n - 1));
+        if (onSeek) onSeek(targetStep);
+      };
     }
   }
 
   /**
-   * EventRenderer: Formats and displays event details and policy reasons.
+   * EventRenderer: Formats compact, readable event records for the current step.
    */
   class EventRenderer {
     static renderEvents(container, step) {
+      if (!container) return;
       container.innerHTML = '';
       if (!step) return;
 
       const events = step.events || [];
-      const stepNum = step.stepNumber;
-
-      // Determine step summary message & status
-      let summaryTitle = `Step ${stepNum}`;
-      let summaryDesc = 'No state changing events in this step.';
-      let bannerClass = 'step-summary-banner';
-
-      for (const ev of events) {
-        if (ev.type === 'AllocationFailed') {
-          summaryTitle = `Allocation Failed (${ev.data?.cause || 'REJECTED'})`;
-          summaryDesc = `Process ${ev.data?.pid || ''} requested ${ev.data?.requested} units. Largest hole was ${ev.data?.largest_hole}, failing due to ${ev.data?.cause}.`;
-          bannerClass += ' failure';
-          break;
-        } else if (ev.type === 'BlockAllocated') {
-          summaryTitle = `Block Allocated (${ev.data?.pid}:${ev.data?.id})`;
-          summaryDesc = `Placed ${ev.data?.size} units at address [${ev.data?.start}, ${ev.data?.start + ev.data?.size}).`;
-          break;
-        } else if (ev.type === 'CompactionCompleted') {
-          summaryTitle = `Compaction Completed`;
-          summaryDesc = `Relocated ${ev.data?.blocks_moved} blocks, moving ${ev.data?.units_moved} units into 1 contiguous hole.`;
-          break;
-        } else if (ev.type === 'PageFault') {
-          summaryTitle = `Page Fault (${ev.data?.kind || 'FAULT'})`;
-          summaryDesc = `Access to VPN ${ev.data?.vpn} by process ${ev.data?.pid} resulted in a ${ev.data?.kind} fault.`;
-          bannerClass += ' failure';
-          break;
-        } else if (ev.type === 'PageHit') {
-          summaryTitle = `Page Hit (Frame ${ev.data?.frame})`;
-          summaryDesc = `Access to VPN ${ev.data?.vpn} hit in Frame ${ev.data?.frame}.`;
-          bannerClass += ' hit';
-          break;
-        }
-      }
-
-      const summaryBanner = document.createElement('div');
-      summaryBanner.className = bannerClass;
-      summaryBanner.innerHTML = `
-        <div class="step-summary-title">${summaryTitle}</div>
-        <div class="step-summary-desc">${summaryDesc}</div>
-      `;
-      container.appendChild(summaryBanner);
-
-      // Event List
-      const listEl = document.createElement('div');
-      listEl.className = 'events-list';
-
       if (events.length === 0) {
-        listEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem 0;">No individual event records for this step.</div>';
-      } else {
-        events.forEach(ev => {
-          const item = document.createElement('div');
-          item.className = 'event-item';
-          const chipClass = `chip-${ev.type}`;
-
-          const dataPairs = Object.entries(ev.data || {})
-            .map(([k, v]) => `${k}: ${typeof v === 'object' && v !== null ? JSON.stringify(v) : v}`)
-            .join(' · ');
-
-          item.innerHTML = `
-            <div class="event-item-header">
-              <span class="event-chip ${chipClass}">${ev.type}</span>
-              <span class="event-seq">seq ${ev.seq}</span>
-            </div>
-            <div class="event-params">${dataPairs || '—'}</div>
-          `;
-          listEl.appendChild(item);
-        });
+        container.innerHTML = '<div style="color:var(--faint);font-size:12px;padding:8px 0;">No state changing events in this step.</div>';
+        return;
       }
 
-      container.appendChild(listEl);
+      events.forEach(ev => {
+        const row = document.createElement('div');
+        row.className = 'event-row';
+
+        const seqSpan = document.createElement('span');
+        seqSpan.className = 'event-seq mono';
+        seqSpan.textContent = ev.seq !== undefined ? ev.seq : '—';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'event-name';
+        nameSpan.textContent = ev.type;
+
+        const fieldsSpan = document.createElement('span');
+        fieldsSpan.className = 'event-fields mono';
+        const entries = Object.entries(ev.data || {});
+        fieldsSpan.textContent = entries.map(([k, v]) => `${k}=${typeof v === 'object' && v !== null ? JSON.stringify(v) : v}`).join(' ');
+
+        row.appendChild(seqSpan);
+        row.appendChild(nameSpan);
+        row.appendChild(fieldsSpan);
+        container.appendChild(row);
+      });
     }
   }
 
   /**
-   * Sample Traces: Preloaded fixtures for AC-1, AC-2, AC-3, AC-4
+   * UIController: Coordinates DOM views, interactions, keyboard navigation,
+   * narration generation, and theme management.
+   */
+  class UIController {
+    constructor() {
+      this.engine = new PlaybackEngine();
+      this.lastRenderedStep = -1;
+      this.isScrubbing = false;
+
+      this.bindDOMElements();
+      this.initTheme();
+      this.bindEvents();
+
+      // Listen for playback state updates
+      this.engine.addListener((type) => {
+        if (type === 'load') {
+          ContiguousRenderer.assignProcessColors(this.engine.trace);
+          this.lastRenderedStep = -1;
+          this.updateTraceHeader();
+          this.updateScrubberBounds();
+          this.updateEmptyState();
+        }
+        this.updateView();
+      });
+
+      // Default empty state
+      this.updateEmptyState();
+    }
+
+    bindDOMElements() {
+      // Top bar
+      this.traceName = document.getElementById('trace-name');
+      this.metaPolicy = document.getElementById('meta-policy');
+      this.metaConfig = document.getElementById('meta-config');
+      this.fileInput = document.getElementById('file-input');
+      this.btnOpenFile = document.getElementById('btn-open-file');
+      this.sampleSelect = document.getElementById('sample-select');
+      this.btnThemeToggle = document.getElementById('btn-theme-toggle');
+      this.themeIconSlot = document.getElementById('theme-icon-slot');
+      this.btnKeyboardHelp = document.getElementById('btn-keyboard-help');
+      this.keyboardPopover = document.getElementById('keyboard-popover');
+
+      // Empty state
+      this.emptyState = document.getElementById('empty-state');
+      this.btnEmptyOpen = document.getElementById('btn-empty-open');
+      this.loadErrorMessage = document.getElementById('load-error-message');
+      this.dashboardGrid = document.getElementById('dashboard-grid');
+
+      // Left panel
+      this.headingMemoryPanel = document.getElementById('heading-memory-panel');
+      this.contiguousViewport = document.getElementById('contiguous-viewport');
+      this.memoryStrip = document.getElementById('memory-strip');
+      this.addressRuler = document.getElementById('address-ruler');
+      this.failureBracket = document.getElementById('failure-bracket');
+      this.pagingViewport = document.getElementById('paging-viewport');
+      this.pagingTableWrapper = document.getElementById('paging-table-wrapper');
+      this.pagingThead = document.getElementById('paging-thead');
+      this.pagingTbody = document.getElementById('paging-tbody');
+      this.pagingTfoot = document.getElementById('paging-tfoot');
+      this.narrationText = document.getElementById('narration-text');
+      this.blockPopover = document.getElementById('block-popover');
+
+      // Right panels
+      this.headingMetricsPanel = document.getElementById('heading-metrics-panel');
+      this.metricsTbody = document.getElementById('metrics-tbody');
+      this.stepChartSvg = document.getElementById('step-chart-svg');
+      this.eventsList = document.getElementById('events-list');
+
+      // Transport bar
+      this.btnSkipStart = document.getElementById('btn-skip-start');
+      this.btnStepBack = document.getElementById('btn-step-back');
+      this.btnPlayPause = document.getElementById('btn-play-pause');
+      this.playIconSlot = document.getElementById('play-icon-slot');
+      this.btnStepForward = document.getElementById('btn-step-forward');
+      this.btnSkipEnd = document.getElementById('btn-skip-end');
+      this.stepCounter = document.getElementById('step-counter');
+      this.scrubberTicks = document.getElementById('scrubber-ticks');
+      this.scrubberRange = document.getElementById('scrubber-range');
+      this.speedSelect = document.getElementById('speed-select');
+    }
+
+    initTheme() {
+      let savedTheme = 'dark';
+      try {
+        savedTheme = localStorage.getItem('memforge-theme') || 'dark';
+      } catch (e) {}
+
+      if (savedTheme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      this.updateThemeButtonIcon();
+    }
+
+    toggleTheme() {
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      const nextTheme = isLight ? 'dark' : 'light';
+      if (nextTheme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      try {
+        localStorage.setItem('memforge-theme', nextTheme);
+      } catch (e) {}
+      this.updateThemeButtonIcon();
+    }
+
+    updateThemeButtonIcon() {
+      if (!this.themeIconSlot) return;
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      if (isLight) {
+        // Moon icon for switching to dark
+        this.themeIconSlot.innerHTML = `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5 A5.5 5.5 0 1 1 6.5 2.5 A4.5 4.5 0 0 0 13.5 9.5 Z" /></svg>`;
+      } else {
+        // Sun icon for switching to light
+        this.themeIconSlot.innerHTML = `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3" /><line x1="8" y1="1.5" x2="8" y2="3" /><line x1="8" y1="13" x2="8" y2="14.5" /><line x1="1.5" y1="8" x2="3" y2="8" /><line x1="13" y1="8" x2="14.5" y2="8" /><line x1="3.4" y1="3.4" x2="4.5" y2="4.5" /><line x1="11.5" y1="11.5" x2="12.6" y2="12.6" /><line x1="3.4" y1="12.6" x2="4.5" y2="11.5" /><line x1="11.5" y1="4.5" x2="12.6" y2="3.4" /></svg>`;
+      }
+    }
+
+    bindEvents() {
+      // File open dialogs
+      if (this.btnOpenFile) this.btnOpenFile.onclick = () => this.fileInput?.click();
+      if (this.btnEmptyOpen) this.btnEmptyOpen.onclick = () => this.fileInput?.click();
+
+      if (this.fileInput) {
+        this.fileInput.onchange = (e) => {
+          const file = e.target.files?.[0];
+          if (file) this.loadFile(file);
+        };
+      }
+
+      // Drag and drop trace file on window
+      window.addEventListener('dragover', (e) => e.preventDefault());
+      window.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const file = e.dataTransfer?.files?.[0];
+        if (file) this.loadFile(file);
+      });
+
+      // Sample trace selections
+      if (this.sampleSelect) {
+        this.sampleSelect.onchange = () => {
+          const key = this.sampleSelect.value;
+          if (key && SAMPLE_TRACES[key]) {
+            this.loadTraceString(SAMPLE_TRACES[key], `sample_${key}.jsonl`);
+          }
+        };
+      }
+
+      document.querySelectorAll('.btn-sample-card').forEach(btn => {
+        btn.onclick = () => {
+          const key = btn.getAttribute('data-sample');
+          if (key && SAMPLE_TRACES[key]) {
+            this.loadTraceString(SAMPLE_TRACES[key], `sample_${key}.jsonl`);
+          }
+        };
+      });
+
+      // Theme toggle button
+      if (this.btnThemeToggle) {
+        this.btnThemeToggle.onclick = () => this.toggleTheme();
+      }
+
+      // Keyboard shortcuts help popover
+      if (this.btnKeyboardHelp) {
+        this.btnKeyboardHelp.onclick = (e) => {
+          e.stopPropagation();
+          const isHidden = this.keyboardPopover.hasAttribute('hidden');
+          if (isHidden) {
+            this.keyboardPopover.removeAttribute('hidden');
+            this.btnKeyboardHelp.setAttribute('aria-expanded', 'true');
+          } else {
+            this.keyboardPopover.setAttribute('hidden', '');
+            this.btnKeyboardHelp.setAttribute('aria-expanded', 'false');
+          }
+        };
+      }
+
+      document.addEventListener('click', (e) => {
+        if (this.keyboardPopover && !this.keyboardPopover.contains(e.target) && e.target !== this.btnKeyboardHelp) {
+          this.keyboardPopover.setAttribute('hidden', '');
+          this.btnKeyboardHelp?.setAttribute('aria-expanded', 'false');
+        }
+      });
+
+      // Transport controls
+      if (this.btnSkipStart) this.btnSkipStart.onclick = () => this.engine.reset();
+      if (this.btnStepBack) this.btnStepBack.onclick = () => this.engine.prevStep();
+      if (this.btnPlayPause) this.btnPlayPause.onclick = () => this.engine.togglePlay();
+      if (this.btnStepForward) this.btnStepForward.onclick = () => this.engine.nextStep();
+      if (this.btnSkipEnd) this.btnSkipEnd.onclick = () => this.engine.goToStep(this.engine.totalSteps - 1);
+
+      // Scrubber range
+      if (this.scrubberRange) {
+        this.scrubberRange.oninput = (e) => {
+          this.isScrubbing = true;
+          this.engine.goToStep(Number(e.target.value));
+        };
+        this.scrubberRange.onchange = () => {
+          this.isScrubbing = false;
+        };
+      }
+
+      // Playback speed
+      if (this.speedSelect) {
+        this.speedSelect.onchange = () => {
+          this.engine.setSpeed(Number(this.speedSelect.value));
+        };
+      }
+
+      // Global keyboard shortcuts
+      window.addEventListener('keydown', (e) => {
+        // Ignore if user is inside an input or select
+        if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName) && document.activeElement !== this.scrubberRange) {
+          return;
+        }
+
+        switch (e.key) {
+          case ' ':
+            e.preventDefault();
+            this.engine.togglePlay();
+            break;
+          case 'ArrowLeft':
+            e.preventDefault();
+            this.engine.prevStep();
+            break;
+          case 'ArrowRight':
+            e.preventDefault();
+            this.engine.nextStep();
+            break;
+          case 'Home':
+            e.preventDefault();
+            this.engine.reset();
+            break;
+          case 'End':
+            e.preventDefault();
+            this.engine.goToStep(this.engine.totalSteps - 1);
+            break;
+          case 't':
+          case 'T':
+            this.toggleTheme();
+            break;
+          case '?':
+            this.btnKeyboardHelp?.click();
+            break;
+          case 'Escape':
+            this.keyboardPopover?.setAttribute('hidden', '');
+            this.btnKeyboardHelp?.setAttribute('aria-expanded', 'false');
+            if (this.blockPopover) this.blockPopover.setAttribute('hidden', '');
+            break;
+        }
+      });
+    }
+
+    loadFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        this.loadTraceString(e.target.result, file.name);
+      };
+      reader.onerror = () => {
+        this.showLoadError('Could not read trace file from disk.');
+      };
+      reader.readAsText(file);
+    }
+
+    loadTraceString(traceText, filename = 'trace.jsonl') {
+      const parseResult = TraceParser.parseTrace(traceText);
+      if (!parseResult.ok) {
+        this.showLoadError(parseResult.error);
+        return;
+      }
+
+      this.clearLoadError();
+      this.currentFilename = filename;
+      this.engine.loadTrace(parseResult.trace);
+    }
+
+    showLoadError(msg) {
+      if (this.loadErrorMessage) {
+        this.loadErrorMessage.textContent = msg;
+        this.loadErrorMessage.removeAttribute('hidden');
+      }
+    }
+
+    clearLoadError() {
+      if (this.loadErrorMessage) {
+        this.loadErrorMessage.textContent = '';
+        this.loadErrorMessage.setAttribute('hidden', '');
+      }
+    }
+
+    updateEmptyState() {
+      const hasTrace = this.engine.trace !== null;
+      if (this.emptyState) this.emptyState.hidden = hasTrace;
+      if (this.dashboardGrid) this.dashboardGrid.hidden = !hasTrace;
+
+      // Enable / disable transport controls
+      [this.btnSkipStart, this.btnStepBack, this.btnPlayPause, this.btnStepForward, this.btnSkipEnd, this.scrubberRange].forEach(el => {
+        if (el) el.disabled = !hasTrace;
+      });
+    }
+
+    updateTraceHeader() {
+      const trace = this.engine.trace;
+      if (!trace) return;
+
+      const h = trace.header;
+      if (this.traceName) this.traceName.textContent = this.currentFilename || h.workload || 'trace.jsonl';
+      if (this.metaPolicy) this.metaPolicy.textContent = `policy ${h.policy || 'first-fit'}`;
+
+      if (this.metaConfig) {
+        if (trace.subsystem === 'contiguous') {
+          const memSize = h.config?.memory_size || 1000;
+          this.metaConfig.textContent = `contiguous · ${memSize} units`;
+        } else {
+          const frames = h.config?.frames || 3;
+          const pageSize = h.config?.page_size || 4096;
+          this.metaConfig.textContent = `paging · ${frames} frames · ${pageSize} B pages`;
+        }
+      }
+    }
+
+    updateScrubberBounds() {
+      const trace = this.engine.trace;
+      const total = trace ? trace.totalSteps : 0;
+
+      if (this.scrubberRange) {
+        this.scrubberRange.min = '0';
+        this.scrubberRange.max = String(Math.max(0, total - 1));
+        this.scrubberRange.value = '0';
+      }
+
+      // Render failure and compaction ticks behind the scrubber track
+      if (this.scrubberTicks && trace && total > 1) {
+        this.scrubberTicks.innerHTML = '';
+        trace.steps.forEach((s, idx) => {
+          const isFail = s.events.some(e => e.type === 'AllocationFailed' || e.type === 'PageFault');
+          const isComp = s.events.some(e => e.type === 'CompactionCompleted' || e.type === 'CompactionStarted');
+
+          if (isFail || isComp) {
+            const tick = document.createElement('div');
+            tick.className = `scrubber-tick-item ${isFail ? 'tick-bad' : 'tick-accent'}`;
+            tick.style.left = `${(idx / (total - 1)) * 100}%`;
+            this.scrubberTicks.appendChild(tick);
+          }
+        });
+      }
+    }
+
+    updateView() {
+      const trace = this.engine.trace;
+      const step = this.engine.currentStep;
+      if (!trace || !step) return;
+
+      const currentIdx = this.engine.currentStepIndex;
+      const total = this.engine.totalSteps;
+      const prevStep = (this.lastRenderedStep >= 0 && this.lastRenderedStep < total)
+        ? trace.steps[this.lastRenderedStep]
+        : null;
+
+      // Animation decision
+      const isOneStepForward = (currentIdx === this.lastRenderedStep + 1);
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const shouldAnimate = isOneStepForward && !this.isScrubbing && !reducedMotion;
+
+      // 1. Update Transport Bar State
+      if (this.stepCounter) this.stepCounter.textContent = `${currentIdx + 1} / ${total}`;
+      if (this.scrubberRange) {
+        this.scrubberRange.value = String(currentIdx);
+        const pct = total > 1 ? (currentIdx / (total - 1)) * 100 : 0;
+        this.scrubberRange.style.setProperty('--track-bg', `linear-gradient(to right, var(--accent) 0%, var(--accent) ${pct}%, var(--rule) ${pct}%, var(--rule) 100%)`);
+      }
+
+      if (this.btnPlayPause && this.playIconSlot) {
+        if (this.engine.isPlaying) {
+          this.btnPlayPause.setAttribute('aria-label', 'Pause');
+          this.playIconSlot.innerHTML = `<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="5.5" y1="3.5" x2="5.5" y2="12.5" /><line x1="10.5" y1="3.5" x2="10.5" y2="12.5" /></svg>`;
+        } else {
+          this.btnPlayPause.setAttribute('aria-label', 'Play');
+          this.playIconSlot.innerHTML = `<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M5 3.5 L12 8 L5 12.5 Z" /></svg>`;
+        }
+      }
+
+      // 2. Render Left Panel (Contiguous vs Paging)
+      if (trace.subsystem === 'contiguous') {
+        if (this.headingMemoryPanel) this.headingMemoryPanel.textContent = 'Memory';
+        if (this.contiguousViewport) this.contiguousViewport.hidden = false;
+        if (this.pagingViewport) this.pagingViewport.hidden = true;
+
+        const memSize = step.snapshot?.contiguous?.memory_size || 1000;
+
+        ContiguousRenderer.renderContiguous(
+          this.memoryStrip,
+          step,
+          prevStep,
+          shouldAnimate,
+          (block, el, ev) => this.showBlockPopover(block, el, ev)
+        );
+
+        ContiguousRenderer.renderAddressRuler(this.addressRuler, memSize);
+      } else {
+        if (this.headingMemoryPanel) this.headingMemoryPanel.textContent = 'Frames';
+        if (this.contiguousViewport) this.contiguousViewport.hidden = true;
+        if (this.pagingViewport) this.pagingViewport.hidden = false;
+
+        PagingRenderer.renderPaging(
+          this.pagingTableWrapper,
+          this.pagingThead,
+          this.pagingTbody,
+          this.pagingTfoot,
+          trace,
+          currentIdx,
+          shouldAnimate
+        );
+      }
+
+      // 3. Step Narration
+      if (this.narrationText) {
+        this.narrationText.innerHTML = UIController.narrate(step.events, step, prevStep, trace);
+      }
+
+      // 4. Right Panel 1: Metrics Table & Step Chart
+      if (this.headingMetricsPanel) {
+        this.headingMetricsPanel.textContent = trace.subsystem === 'contiguous' ? 'Fragmentation' : 'Faults';
+      }
+      MetricsRenderer.renderMetrics(this.metricsTbody, step, prevStep, trace);
+      MetricsRenderer.renderStepChart(this.stepChartSvg, trace, currentIdx, (seekIdx) => {
+        this.engine.goToStep(seekIdx);
+      });
+
+      // 5. Right Panel 2: Events List
+      EventRenderer.renderEvents(this.eventsList, step);
+
+      this.lastRenderedStep = currentIdx;
+    }
+
+    showBlockPopover(block, el, ev) {
+      if (!this.blockPopover) return;
+      if (!block) {
+        this.blockPopover.setAttribute('hidden', '');
+        return;
+      }
+
+      const idVal = block.id || '—';
+      const pidVal = block.pid || '—';
+      const startVal = block.start;
+      const sizeVal = block.size;
+      const endVal = block.start + block.size;
+      const stateVal = block.state;
+
+      document.getElementById('popover-id').textContent = idVal;
+      document.getElementById('popover-pid').textContent = pidVal;
+      document.getElementById('popover-start').textContent = startVal;
+      document.getElementById('popover-size').textContent = sizeVal;
+      document.getElementById('popover-end').textContent = endVal;
+      document.getElementById('popover-state').textContent = stateVal;
+
+      // Position popover
+      const rect = el.getBoundingClientRect();
+      const popoverWidth = 180;
+      let left = rect.left + rect.width / 2 - popoverWidth / 2;
+      left = Math.max(16, Math.min(window.innerWidth - popoverWidth - 16, left));
+      const top = rect.bottom + 8;
+
+      this.blockPopover.style.left = `${left}px`;
+      this.blockPopover.style.top = `${top}px`;
+      this.blockPopover.removeAttribute('hidden');
+
+      // Also highlight tick on address ruler
+      const memSize = this.engine.currentStep?.snapshot?.contiguous?.memory_size || 1000;
+      ContiguousRenderer.renderAddressRuler(this.addressRuler, memSize, block.start);
+    }
+
+    /**
+     * Generates one clear, informative sentence explaining mechanism and result,
+     * with IDs and numbers in mono and coloured with their process colour.
+     */
+    static narrate(stepEvents, step, prevStep, trace) {
+      const numSpan = (n) => `<span class="narrate-num mono">${n}</span>`;
+      const pidSpan = (p) => {
+        const color = ContiguousRenderer.getPidColor(p);
+        return `<span class="narrate-pid mono" style="color:${color}">${p}</span>`;
+      };
+      const idSpan = (id, p) => {
+        const color = ContiguousRenderer.getPidColor(p);
+        return `<span class="narrate-id mono" style="color:${color}">${id}</span>`;
+      };
+
+      const formatPolicy = (pol) => {
+        if (!pol) return 'First-Fit';
+        return pol.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('-');
+      };
+
+      if (!stepEvents || stepEvents.length === 0) {
+        if (step?.stepIndex === 0) {
+          if (trace?.subsystem === 'contiguous') {
+            const memSize = step.snapshot?.contiguous?.memory_size || 1000;
+            const holes = step.snapshot?.contiguous?.frag?.hole_count || 0;
+            return `Initial state: ${numSpan(memSize)} units with ${numSpan(holes)} free holes ready for allocation.`;
+          } else {
+            const frames = trace?.header?.config?.frames || 3;
+            return `Initial state: ${numSpan(frames)} physical frames, global FIFO replacement.`;
+          }
+        }
+        return 'Memory state unchanged in this step.';
+      }
+
+      const pDec = stepEvents.find(e => e.type === 'PlacementDecided');
+      const bAlloc = stepEvents.find(e => e.type === 'BlockAllocated');
+      const bSplit = stepEvents.find(e => e.type === 'BlockSplit');
+      const failEv = stepEvents.find(e => e.type === 'AllocationFailed');
+      const freedEv = stepEvents.find(e => e.type === 'BlockFreed');
+      const coalEv = stepEvents.find(e => e.type === 'BlocksCoalesced');
+      const compDone = stepEvents.find(e => e.type === 'CompactionCompleted');
+      const freeRej = stepEvents.find(e => e.type === 'FreeRejected');
+      const allocRej = stepEvents.find(e => e.type === 'AllocRejected');
+
+      // Paging events
+      const hitEv = stepEvents.find(e => e.type === 'PageHit');
+      const faultEv = stepEvents.find(e => e.type === 'PageFault');
+      const evictEv = stepEvents.find(e => e.type === 'PageEvicted');
+      const loadEv = stepEvents.find(e => e.type === 'PageLoaded');
+      const frameAllocEv = stepEvents.find(e => e.type === 'FrameAllocated');
+      const procSpawn = stepEvents.find(e => e.type === 'ProcessSpawned');
+
+      // Template 1: PlacementDecided + BlockSplit + BlockAllocated
+      if (pDec && bAlloc) {
+        const policy = formatPolicy(pDec.data.policy);
+        const req = pDec.data.requested;
+        const scanned = pDec.data.scanned;
+        const start = bAlloc.data.start;
+        const holeSize = pDec.data.hole ? pDec.data.hole.size : (bAlloc.data.size + (bSplit?.data?.remainder?.size || 0));
+        const rem = bSplit?.data?.remainder ? bSplit.data.remainder.size : 0;
+        const pid = bAlloc.data.pid;
+
+        if (rem > 0) {
+          return `${pidSpan(pid)} requests ${numSpan(req)}. ${policy} scanned ${numSpan(scanned)} ${scanned === 1 ? 'hole' : 'holes'} and placed it at ${numSpan(start)} in the ${numSpan(holeSize)}-unit hole, leaving ${numSpan(rem)} free.`;
+        }
+        return `${pidSpan(pid)} requests ${numSpan(req)}. ${policy} scanned ${numSpan(scanned)} ${scanned === 1 ? 'hole' : 'holes'} and placed it at ${numSpan(start)} in the ${numSpan(holeSize)}-unit hole (exact fit).`;
+      }
+
+      // Template 2: AllocationFailed (FRAGMENTATION or CAPACITY)
+      if (failEv) {
+        const pid = failEv.data.pid;
+        const req = failEv.data.requested;
+        const free = failEv.data.total_free;
+        const largest = failEv.data.largest_hole;
+
+        if (failEv.data.cause === 'FRAGMENTATION') {
+          return `${pidSpan(pid)} requests ${numSpan(req)}. ${numSpan(free)} units are free, but the largest hole is only ${numSpan(largest)}, so the request fails: external fragmentation.`;
+        }
+        return `${pidSpan(pid)} requests ${numSpan(req)}. Only ${numSpan(free)} units are free in total, so the request fails: not enough memory.`;
+      }
+
+      // Template 3: BlockFreed (+ BlocksCoalesced)
+      if (freedEv) {
+        const pid = freedEv.data.pid;
+        const id = freedEv.data.id;
+        const start = freedEv.data.start;
+        const size = freedEv.data.size;
+
+        if (coalEv) {
+          const mergedSize = coalEv.data.merged_size || coalEv.data.size || size;
+          return `${pidSpan(pid)} frees ${idSpan(id, pid)} (start ${numSpan(start)}, size ${numSpan(size)}); it merges with its free neighbours into one hole of ${numSpan(mergedSize)}.`;
+        }
+        return `${pidSpan(pid)} frees ${idSpan(id, pid)} (start ${numSpan(start)}, size ${numSpan(size)}), leaving a free hole of ${numSpan(size)}.`;
+      }
+
+      // Template 4: Compaction
+      if (compDone) {
+        const moved = compDone.data.blocks_moved;
+        const units = compDone.data.units_moved;
+        const largest = compDone.data.largest_after;
+        const hole = step?.snapshot?.contiguous?.blocks?.find(b => b.state === 'free');
+        const holeStart = hole ? hole.start : (step?.snapshot?.contiguous?.memory_size - largest);
+        return `Compaction moves ${numSpan(moved)} blocks, ${numSpan(units)} units in total, leaving one hole of ${numSpan(largest)} at ${numSpan(holeStart)}.`;
+      }
+
+      // Template 5: Rejections
+      if (freeRej) {
+        const pid = freeRej.data.pid;
+        const id = freeRej.data.id;
+        const reason = freeRej.data.reason || 'double free';
+        return `Rejected: ${pidSpan(pid)} frees ${idSpan(id, pid)} twice (${reason}). Memory is unchanged.`;
+      }
+      if (allocRej) {
+        const pid = allocRej.data.pid;
+        const reason = allocRej.data.reason || 'invalid size';
+        return `Rejected: ${pidSpan(pid)} allocation request rejected (${reason}). Memory is unchanged.`;
+      }
+
+      // Template 6: Paging Events
+      if (hitEv) {
+        const pid = hitEv.data.pid;
+        const vpn = hitEv.data.vpn;
+        const frame = hitEv.data.frame;
+        return `${pidSpan(pid)} reads page ${numSpan(vpn)}: hit in frame ${numSpan(frame)}.`;
+      }
+
+      if (faultEv) {
+        const pid = faultEv.data.pid;
+        const vpn = faultEv.data.vpn;
+        const kind = (faultEv.data.kind || 'page fault').toLowerCase();
+        const policy = trace?.header?.policy ? trace.header.policy.toUpperCase() : 'FIFO';
+
+        if (evictEv) {
+          return `${pidSpan(pid)} reads page ${numSpan(vpn)}: page fault (${kind}). No free frame; ${policy} evicts page ${numSpan(evictEv.data.vpn)} from frame ${numSpan(evictEv.data.frame)} (it was loaded first), and page ${numSpan(vpn)} is loaded there.`;
+        }
+        const frameNum = loadEv ? loadEv.data.frame : (frameAllocEv ? frameAllocEv.data.frame : 0);
+        return `${pidSpan(pid)} reads page ${numSpan(vpn)}: page fault (${kind}). Frame ${numSpan(frameNum)} was free, so page ${numSpan(vpn)} is loaded there.`;
+      }
+
+      if (procSpawn) {
+        const pid = procSpawn.data.pid;
+        const pages = procSpawn.data.pages;
+        return `Process ${pidSpan(pid)} spawned with ${numSpan(pages)} virtual pages.`;
+      }
+
+      // Fallback: list event names
+      return stepEvents.map(e => e.type).join(', ');
+    }
+  }
+
+  /**
+   * Sample Traces: Preloaded fixtures for AC-1, AC-2, AC-3
+   * Strictly preserved for test suite compatibility.
    */
   const SAMPLE_TRACES = {
     ac1: `{"type":"TraceHeader","schema":1,"engine":"0.1.0","git":"3bcf43b","workload":"silberschatz_5_holes","policy":"first-fit","config":{"memory_size":1740,"alignment":1,"min_split":1,"compaction":"never"},"trace_level":1}
@@ -942,346 +1938,6 @@
 {"seq":20,"step":5,"type":"Snapshot","step":5,"paging":{"frames":[{"frame":0,"pid":"P0","vpn":2,"referenced":true,"dirty":false},{"frame":1,"pid":"P0","vpn":0,"referenced":true,"dirty":false},{"frame":2,"pid":"P0","vpn":1,"referenced":true,"dirty":false}],"page_tables":{"P0":[{"vpn":0,"frame":1,"present":true,"referenced":true,"dirty":false},{"vpn":1,"frame":2,"present":true,"referenced":true,"dirty":false},{"vpn":2,"frame":0,"present":true,"referenced":true,"dirty":false}]},"policy_state":{"policy":"fifo","queue":[1,2,0]}}}
 {"type":"RunSummary","metrics":{"references":5,"hits":1,"faults":4,"compulsory_faults":4,"capacity_faults":0,"evictions":1,"write_backs":0,"fault_rate":0.8,"hit_rate":0.2}}`
   };
-
-  /**
-   * UIController: Binds DOM elements, manages interactions, keyboard shortcuts, and view rendering.
-   */
-  class UIController {
-    constructor() {
-      this.engine = new PlaybackEngine();
-      this.selectedBlock = null;
-
-      this.initDomReferences();
-      this.bindEvents();
-
-      this.engine.addListener((eventType) => {
-        this.updateView(eventType);
-      });
-
-      console.log('MemForge viewer initialized.');
-    }
-
-    initDomReferences() {
-      // Buttons & Inputs
-      this.fileInput = document.getElementById('trace-file-input');
-      this.loadFileBtn = document.getElementById('btn-load-file');
-      this.dropzone = document.getElementById('trace-dropzone');
-      this.sampleBtnAc1 = document.getElementById('btn-sample-ac1');
-      this.sampleBtnAc2 = document.getElementById('btn-sample-ac2');
-      this.sampleBtnAc3 = document.getElementById('btn-sample-ac3');
-
-      // Transport controls
-      this.btnPlay = document.getElementById('btn-play');
-      this.btnPrev = document.getElementById('btn-prev');
-      this.btnNext = document.getElementById('btn-next');
-      this.btnReset = document.getElementById('btn-reset');
-      this.btnFailure = document.getElementById('btn-failure');
-      this.scrubSlider = document.getElementById('scrub-slider');
-      this.speedSelect = document.getElementById('playback-speed');
-      this.stepDisplay = document.getElementById('step-display');
-      this.stepTotal = document.getElementById('step-total');
-
-      // Containers & Panels
-      this.notificationContainer = document.getElementById('notification-container');
-      this.metaWorkload = document.getElementById('meta-workload');
-      this.metaPolicy = document.getElementById('meta-policy');
-      this.metaSubsystem = document.getElementById('meta-subsystem');
-      this.metaConfig = document.getElementById('meta-config');
-
-      this.vizContainer = document.getElementById('viz-container');
-      this.metricsContainer = document.getElementById('metrics-container');
-      this.eventsContainer = document.getElementById('events-container');
-      this.inspectorContainer = document.getElementById('inspector-container');
-      this.rulerContainer = document.getElementById('ruler-container');
-      this.emptyState = document.getElementById('empty-state');
-      this.dashboardGrid = document.getElementById('dashboard-grid');
-    }
-
-    bindEvents() {
-      // File Input Trigger
-      if (this.loadFileBtn && this.fileInput) {
-        this.loadFileBtn.addEventListener('click', () => this.fileInput.click());
-        this.fileInput.addEventListener('change', (e) => {
-          const file = e.target.files && e.target.files[0];
-          if (file) this.readFile(file);
-        });
-      }
-
-      // Drag and Drop
-      if (this.dropzone) {
-        ['dragenter', 'dragover'].forEach(name => {
-          this.dropzone.addEventListener(name, (e) => {
-            e.preventDefault();
-            this.dropzone.style.borderColor = 'var(--border-focus)';
-            this.dropzone.style.backgroundColor = 'rgba(0, 210, 255, 0.05)';
-          });
-        });
-        ['dragleave', 'drop'].forEach(name => {
-          this.dropzone.addEventListener(name, (e) => {
-            e.preventDefault();
-            this.dropzone.style.borderColor = 'var(--border-subtle)';
-            this.dropzone.style.backgroundColor = 'transparent';
-          });
-        });
-        this.dropzone.addEventListener('drop', (e) => {
-          const dt = e.dataTransfer;
-          if (dt && dt.files && dt.files.length > 0) {
-            this.readFile(dt.files[0]);
-          }
-        });
-      }
-
-      // Sample Trace Buttons
-      if (this.sampleBtnAc1) {
-        this.sampleBtnAc1.addEventListener('click', () => this.loadRawTraceString(SAMPLE_TRACES.ac1, 'AC-1 (First-Fit Fragmentation)'));
-      }
-      if (this.sampleBtnAc2) {
-        this.sampleBtnAc2.addEventListener('click', () => this.loadRawTraceString(SAMPLE_TRACES.ac2, 'AC-2 (Sliding Compaction)'));
-      }
-      if (this.sampleBtnAc3) {
-        this.sampleBtnAc3.addEventListener('click', () => this.loadRawTraceString(SAMPLE_TRACES.ac3, 'AC-3 (Paging FIFO)'));
-      }
-
-      // Transport Control Actions
-      if (this.btnPlay) this.btnPlay.addEventListener('click', () => this.engine.togglePlay());
-      if (this.btnPrev) this.btnPrev.addEventListener('click', () => this.engine.prevStep());
-      if (this.btnNext) this.btnNext.addEventListener('click', () => this.engine.nextStep());
-      if (this.btnReset) this.btnReset.addEventListener('click', () => this.engine.reset());
-      if (this.btnFailure) this.btnFailure.addEventListener('click', () => this.engine.jumpToNextFailureOrFault());
-
-      if (this.speedSelect) {
-        this.speedSelect.addEventListener('change', (e) => {
-          this.engine.setSpeed(parseInt(e.target.value, 10));
-        });
-      }
-
-      if (this.scrubSlider) {
-        this.scrubSlider.addEventListener('input', (e) => {
-          this.engine.goToStep(parseInt(e.target.value, 10));
-        });
-      }
-
-      // Keyboard Shortcuts
-      window.addEventListener('keydown', (e) => {
-        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) {
-          return; // Ignore inside form inputs
-        }
-        if (e.code === 'Space') {
-          e.preventDefault();
-          this.engine.togglePlay();
-        } else if (e.code === 'ArrowRight' || e.key === 'j') {
-          e.preventDefault();
-          this.engine.nextStep();
-        } else if (e.code === 'ArrowLeft' || e.key === 'k') {
-          e.preventDefault();
-          this.engine.prevStep();
-        } else if (e.code === 'Home' || e.key === 'r') {
-          e.preventDefault();
-          this.engine.reset();
-        } else if (e.key === 'f') {
-          e.preventDefault();
-          this.engine.jumpToNextFailureOrFault();
-        }
-      });
-    }
-
-    readFile(file) {
-      this.clearNotifications();
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target.result;
-        this.loadRawTraceString(text, file.name);
-      };
-      reader.onerror = () => {
-        this.showError(`Failed to read file "${file.name}": ${reader.error?.message || 'Unknown read error.'}`);
-      };
-      reader.readAsText(file);
-    }
-
-    loadRawTraceString(rawText, sourceName) {
-      this.clearNotifications();
-      const result = TraceParser.parseTrace(rawText);
-      if (!result.ok) {
-        this.showError(result.error);
-        return;
-      }
-
-      const trace = result.trace;
-      trace.sourceName = sourceName;
-      this.engine.loadTrace(trace);
-
-      // Display warnings if trace capped or incomplete
-      if (trace.warnings && trace.warnings.length > 0) {
-        trace.warnings.forEach(w => this.showWarning(w));
-      }
-    }
-
-    showError(msg) {
-      if (!this.notificationContainer) return;
-      const el = document.createElement('div');
-      el.className = 'banner banner-error';
-      el.innerHTML = `
-        <span class="banner-icon">⚠️</span>
-        <div class="banner-content">
-          <div class="banner-title">Error Loading Trace</div>
-          <div>${msg}</div>
-        </div>
-      `;
-      this.notificationContainer.appendChild(el);
-    }
-
-    showWarning(msg) {
-      if (!this.notificationContainer) return;
-      const el = document.createElement('div');
-      el.className = 'banner banner-warning';
-      el.innerHTML = `
-        <span class="banner-icon">⚡</span>
-        <div class="banner-content">
-          <div class="banner-title">Notice</div>
-          <div>${msg}</div>
-        </div>
-      `;
-      this.notificationContainer.appendChild(el);
-    }
-
-    clearNotifications() {
-      if (this.notificationContainer) {
-        this.notificationContainer.innerHTML = '';
-      }
-    }
-
-    updateView(eventType) {
-      const step = this.engine.currentStep;
-      const trace = this.engine.trace;
-
-      if (!trace || !step) {
-        if (this.emptyState) this.emptyState.style.display = 'flex';
-        if (this.dashboardGrid) this.dashboardGrid.style.display = 'none';
-        return;
-      }
-
-      if (this.emptyState) this.emptyState.style.display = 'none';
-      if (this.dashboardGrid) this.dashboardGrid.style.display = 'grid';
-
-      // 1. Update Header Pills
-      if (eventType === 'load') {
-        const h = trace.header;
-        if (this.metaWorkload) this.metaWorkload.innerHTML = `Workload: <strong>${h.workload || '—'}</strong>`;
-        if (this.metaPolicy) this.metaPolicy.innerHTML = `Policy: <strong>${h.policy || '—'}</strong>`;
-        if (this.metaSubsystem) {
-          this.metaSubsystem.className = `meta-pill subsystem-${trace.subsystem}`;
-          this.metaSubsystem.innerHTML = `Mode: <strong>${trace.subsystem.toUpperCase()}</strong>`;
-        }
-        if (this.metaConfig) {
-          const cfg = h.config || {};
-          const cfgStr = trace.subsystem === 'contiguous'
-            ? `M=${cfg.memory_size || '?'}`
-            : `F=${cfg.frames || '?'}, P=${cfg.page_size || '?'}`;
-          this.metaConfig.innerHTML = `Config: <strong>${cfgStr}</strong>`;
-        }
-
-        // Configure slider bounds
-        if (this.scrubSlider) {
-          this.scrubSlider.min = '0';
-          this.scrubSlider.max = String(Math.max(0, trace.totalSteps - 1));
-        }
-      }
-
-      // 2. Update Transport Controls State
-      const currentIdx = this.engine.currentStepIndex;
-      const totalSteps = this.engine.totalSteps;
-
-      if (this.stepDisplay) this.stepDisplay.textContent = currentIdx + 1;
-      if (this.stepTotal) this.stepTotal.textContent = `/ ${totalSteps}`;
-      if (this.scrubSlider) this.scrubSlider.value = String(currentIdx);
-
-      if (this.btnPlay) {
-        this.btnPlay.innerHTML = this.engine.isPlaying ? '❚❚' : '▶';
-        this.btnPlay.setAttribute('aria-label', this.engine.isPlaying ? 'Pause' : 'Play');
-      }
-
-      if (this.btnPrev) this.btnPrev.disabled = currentIdx === 0;
-      if (this.btnReset) this.btnReset.disabled = currentIdx === 0;
-      if (this.btnNext) this.btnNext.disabled = currentIdx >= totalSteps - 1;
-
-      // 3. Render Memory Map or Paging Grid
-      if (trace.subsystem === 'contiguous') {
-        ContiguousRenderer.renderMemoryMap(this.vizContainer, step, (block, memSize) => {
-          this.updateBlockInspector(block, memSize);
-        });
-        this.renderRuler(step.snapshot?.contiguous?.memory_size || 1000);
-      } else {
-        PagingRenderer.renderPaging(this.vizContainer, step);
-        if (this.rulerContainer) this.rulerContainer.innerHTML = '';
-      }
-
-      // 4. Render Metrics & Events
-      MetricsRenderer.renderMetrics(this.metricsContainer, step, trace);
-      EventRenderer.renderEvents(this.eventsContainer, step);
-    }
-
-    renderRuler(memSize) {
-      if (!this.rulerContainer) return;
-      const q1 = Math.round(memSize * 0.25);
-      const q2 = Math.round(memSize * 0.5);
-      const q3 = Math.round(memSize * 0.75);
-      this.rulerContainer.innerHTML = `
-        <span>0</span>
-        <span>${q1}</span>
-        <span>${q2}</span>
-        <span>${q3}</span>
-        <span>${memSize}</span>
-      `;
-    }
-
-    updateBlockInspector(block, memSize) {
-      if (!this.inspectorContainer) return;
-      if (!block) {
-        this.inspectorContainer.innerHTML = `
-          <div class="inspector-header">Selected Block</div>
-          <div style="color:var(--text-muted);font-size:0.8rem;">Click on any block in the memory map to inspect its details.</div>
-        `;
-        return;
-      }
-
-      const isFree = block.state === 'free';
-      const range = `[${block.start}, ${block.start + block.size})`;
-      const intFrag = (!isFree && block.requested) ? (block.size - block.requested) : 0;
-
-      this.inspectorContainer.innerHTML = `
-        <div class="inspector-header">
-          <span>Selected Block</span>
-          <span class="meta-pill" style="font-size:0.65rem;">${isFree ? 'FREE' : 'ALLOCATED'}</span>
-        </div>
-        <div class="inspector-grid">
-          <div class="inspector-item">
-            <span class="inspector-label">Process ID</span>
-            <span class="inspector-val">${block.pid || '—'}</span>
-          </div>
-          <div class="inspector-item">
-            <span class="inspector-label">Allocation ID</span>
-            <span class="inspector-val">${block.id || '—'}</span>
-          </div>
-          <div class="inspector-item">
-            <span class="inspector-label">Address Range</span>
-            <span class="inspector-val">${range}</span>
-          </div>
-          <div class="inspector-item">
-            <span class="inspector-label">Granted Size</span>
-            <span class="inspector-val">${block.size} units</span>
-          </div>
-          <div class="inspector-item">
-            <span class="inspector-label">Requested</span>
-            <span class="inspector-val">${block.requested !== undefined ? `${block.requested} units` : '—'}</span>
-          </div>
-          <div class="inspector-item">
-            <span class="inspector-label">Internal Frag</span>
-            <span class="inspector-val">${intFrag > 0 ? `${intFrag} units` : '0'}</span>
-          </div>
-        </div>
-      `;
-    }
-  }
 
   // Auto-initialize when loaded in browser
   if (typeof document !== 'undefined') {

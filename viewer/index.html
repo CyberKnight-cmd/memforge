@@ -3,164 +3,216 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="MemForge P9 Trace Viewer — High-performance interactive visualization and replay dashboard for OS memory management and paging simulation traces.">
-  <title>MemForge — Trace Viewer Interface (P9)</title>
+  <title>MemForge Trace Viewer</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- Top Application Header -->
-  <header class="app-header" role="banner">
-    <div class="header-container">
-      <div class="brand-section">
-        <h1 class="brand-logo">
-          <span>⚡ MemForge</span>
-        </h1>
-        <span class="brand-badge">P9 Trace Viewer</span>
+  <!-- Top bar 48px -->
+  <header class="top-bar" role="banner">
+    <div class="top-bar-left">
+      <span class="brand-title">MemForge</span>
+      <div class="divider-rule" aria-hidden="true"></div>
+      <span id="trace-name" class="trace-name mono">—</span>
+      <div id="trace-meta-tags" class="trace-meta-tags">
+        <span id="meta-policy" class="meta-tag">policy —</span>
+        <span id="meta-config" class="meta-tag">—</span>
       </div>
+    </div>
 
-      <div class="trace-meta-pills" id="trace-meta-pills" aria-label="Trace Metadata">
-        <span class="meta-pill" id="meta-workload">Workload: <strong>—</strong></span>
-        <span class="meta-pill" id="meta-policy">Policy: <strong>—</strong></span>
-        <span class="meta-pill subsystem-contiguous" id="meta-subsystem">Mode: <strong>CONTIGUOUS</strong></span>
-        <span class="meta-pill" id="meta-config">Config: <strong>—</strong></span>
+    <div class="top-bar-right">
+      <input type="file" id="file-input" class="visually-hidden" accept=".jsonl,.trace,.json,.txt" aria-label="Open trace file">
+      <button type="button" id="btn-open-file" class="btn btn-top" aria-label="Open trace file">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5 C2 3.7 2.7 3 3.5 3 H6 L7.5 5 H12.5 C13.3 5 14 5.7 14 6.5 V11.5 C14 12.3 13.3 13 12.5 13 H3.5 C2.7 13 2 12.3 2 11.5 Z" /></svg>
+        <span>Open trace</span>
+      </button>
+
+      <select id="sample-select" class="select-top" aria-label="Sample traces">
+        <option value="" disabled selected>Sample traces</option>
+        <option value="ac1">AC-1 First-Fit</option>
+        <option value="ac2">AC-2 Compaction</option>
+        <option value="ac3">AC-3 Paging FIFO</option>
+      </select>
+
+      <button type="button" id="btn-theme-toggle" class="btn btn-top btn-icon" aria-label="Toggle theme">
+        <span id="theme-icon-slot">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3" /><line x1="8" y1="1.5" x2="8" y2="3" /><line x1="8" y1="13" x2="8" y2="14.5" /><line x1="1.5" y1="8" x2="3" y2="8" /><line x1="13" y1="8" x2="14.5" y2="8" /><line x1="3.4" y1="3.4" x2="4.5" y2="4.5" /><line x1="11.5" y1="11.5" x2="12.6" y2="12.6" /><line x1="3.4" y1="12.6" x2="4.5" y2="11.5" /><line x1="11.5" y1="4.5" x2="12.6" y2="3.4" /></svg>
+        </span>
+      </button>
+
+      <button type="button" id="btn-keyboard-help" class="btn btn-top btn-icon" aria-label="Keyboard shortcuts" aria-haspopup="dialog" aria-expanded="false">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3.5" width="12" height="9" rx="1.5" /><line x1="4.5" y1="6" x2="5.5" y2="6" /><line x1="7.5" y1="6" x2="8.5" y2="6" /><line x1="10.5" y1="6" x2="11.5" y2="6" /><line x1="5.5" y1="9" x2="10.5" y2="9" /></svg>
+      </button>
+
+      <!-- Keyboard Help Popover -->
+      <div id="keyboard-popover" class="popover keyboard-popover" role="dialog" aria-label="Keyboard shortcuts" hidden>
+        <div class="popover-title">Keyboard shortcuts</div>
+        <div class="shortcut-list">
+          <div class="shortcut-row"><span class="shortcut-key mono">Space</span><span class="shortcut-desc">Play / pause</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">&larr; / &rarr;</span><span class="shortcut-desc">Step back / step forward</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">Home / End</span><span class="shortcut-desc">Skip to start / skip to end</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">T</span><span class="shortcut-desc">Toggle dark / light theme</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">?</span><span class="shortcut-desc">Show / hide this help</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">Esc</span><span class="shortcut-desc">Close popovers</span></div>
+        </div>
       </div>
     </div>
   </header>
 
-  <!-- Notification Banner Container -->
-  <div id="notification-container" style="max-width:1440px;width:100%;margin:1rem auto 0;padding:0 1.5rem;" role="alert" aria-live="polite"></div>
+  <!-- Main Viewport Area -->
+  <main class="main-viewport" role="main">
 
-  <!-- Main Viewport -->
-  <main class="app-main" role="main">
+    <!-- Empty State (when no trace loaded) -->
+    <div id="empty-state" class="empty-state">
+      <div class="empty-card">
+        <h1 class="empty-heading">Open a MemForge trace</h1>
+        <p class="empty-description">Drop a .jsonl file produced by memsim, or start with a sample.</p>
+        <button type="button" id="btn-empty-open" class="btn btn-primary" aria-label="Open trace">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5 C2 3.7 2.7 3 3.5 3 H6 L7.5 5 H12.5 C13.3 5 14 5.7 14 6.5 V11.5 C14 12.3 13.3 13 12.5 13 H3.5 C2.7 13 2 12.3 2 11.5 Z" /></svg>
+          <span>Open trace</span>
+        </button>
 
-    <!-- Trace Loading Section -->
-    <section class="loader-panel" aria-label="Trace Loading Controls">
-      <div class="loader-row">
-        <div class="file-input-wrapper" id="trace-dropzone">
-          <input type="file" id="trace-file-input" class="file-input-hidden" accept=".jsonl,.trace,.json,.txt" aria-label="Select Trace File">
-          <button type="button" class="btn btn-primary" id="btn-load-file">
-            📁 Open Trace File
+        <div class="sample-list" aria-label="Sample Traces">
+          <button type="button" class="btn-sample-card" data-sample="ac1">
+            <span class="sample-title mono">AC-1 First-Fit</span>
+            <span class="sample-desc">Silberschatz 5 holes with external fragmentation failure</span>
           </button>
-          <span style="font-size:0.8rem;color:var(--text-muted);">or drag & drop a .jsonl trace here</span>
-        </div>
-
-        <div class="sample-traces-group">
-          <span class="sample-label">Quick Samples:</span>
-          <button type="button" class="btn btn-pill" id="btn-sample-ac1" title="AC-1 First-Fit fragmentation failure on Silberschatz 5 holes">AC-1 First-Fit</button>
-          <button type="button" class="btn btn-pill" id="btn-sample-ac2" title="AC-2 Sliding compaction and retry of 426 allocation">AC-2 Compaction</button>
-          <button type="button" class="btn btn-pill" id="btn-sample-ac3" title="AC-3 Paging reference string with 3 frames and FIFO replacement">AC-3 Paging FIFO</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- Playback Control Toolbar -->
-    <section class="playback-bar" aria-label="Trace Playback Controls">
-      <div class="playback-controls-row">
-        <div class="step-counter-box">
-          <span class="step-label">Step</span>
-          <span class="step-display" id="step-display">0</span>
-          <span class="step-total" id="step-total">/ 0</span>
-        </div>
-
-        <div class="transport-buttons">
-          <button type="button" class="btn btn-icon" id="btn-reset" title="Reset to start (Home or r)" aria-label="Reset to start">⏮</button>
-          <button type="button" class="btn btn-icon" id="btn-prev" title="Previous step (Left Arrow or k)" aria-label="Previous step">◀</button>
-          <button type="button" class="btn btn-play-pause" id="btn-play" title="Play / Pause (Space)" aria-label="Play or Pause">▶</button>
-          <button type="button" class="btn btn-icon" id="btn-next" title="Next step (Right Arrow or j)" aria-label="Next step">▶</button>
-          <button type="button" class="btn btn-accent" id="btn-failure" title="Jump to next allocation failure or page fault (f)" style="margin-left:0.5rem;font-size:0.75rem;">
-            ⚠ Next Fault
+          <button type="button" class="btn-sample-card" data-sample="ac2">
+            <span class="sample-title mono">AC-2 Compaction</span>
+            <span class="sample-desc">Sliding compaction resolving fragmentation and retrying request</span>
+          </button>
+          <button type="button" class="btn-sample-card" data-sample="ac3">
+            <span class="sample-title mono">AC-3 Paging FIFO</span>
+            <span class="sample-desc">Paging reference string across 3 physical frames with FIFO replacement</span>
           </button>
         </div>
 
-        <div class="playback-options">
-          <div class="speed-control">
-            <label for="playback-speed">Speed:</label>
-            <select id="playback-speed" class="select-dropdown">
-              <option value="1000">0.5x (1000ms)</option>
-              <option value="500" selected>1.0x (500ms)</option>
-              <option value="250">2.0x (250ms)</option>
-              <option value="100">5.0x (100ms)</option>
-              <option value="50">10.0x (50ms)</option>
-            </select>
-          </div>
-        </div>
+        <div id="load-error-message" class="load-error mono" hidden role="alert"></div>
       </div>
-
-      <div class="scrubber-container">
-        <input type="range" id="scrub-slider" class="scrub-slider" min="0" max="0" value="0" aria-label="Trace Step Scrubber">
-      </div>
-    </section>
-
-    <!-- Empty State -->
-    <div class="empty-state" id="empty-state">
-      <div class="empty-icon">📊</div>
-      <div class="empty-title">No Trace Loaded</div>
-      <p class="empty-desc">
-        Load a MemForge simulator trace file (<code>.jsonl</code>) or choose one of the quick samples above to begin replaying memory allocation and paging events.
-      </p>
     </div>
 
-    <!-- Main Dashboard Grid -->
-    <div class="dashboard-grid" id="dashboard-grid" style="display:none;">
+    <!-- Active Dashboard Grid (2fr / 1fr) -->
+    <div id="dashboard-grid" class="dashboard-grid" hidden>
 
-      <!-- Primary Visualization (Memory Map or Frame Grid) -->
-      <section class="viz-panel" aria-label="Memory Subsystem Visualization">
+      <!-- Left Column: Memory / Frames -->
+      <section class="panel panel-left" aria-labelledby="heading-memory-panel">
         <div class="panel-header">
-          <div class="panel-title">
-            <span>Memory Layout</span>
-          </div>
-          <div class="panel-subtitle" id="viz-subtitle">Snapshot State</div>
+          <h2 id="heading-memory-panel" class="panel-heading">Memory</h2>
         </div>
 
-        <!-- Address Ruler -->
-        <div class="ruler-container" id="ruler-container" aria-hidden="true"></div>
+        <!-- Contiguous Visualization Viewport -->
+        <div id="contiguous-viewport" class="contiguous-viewport">
+          <div class="memory-stage">
+            <div id="ghost-host" class="ghost-host" aria-hidden="true"></div>
+            <div id="memory-strip" class="memory-strip" role="region" aria-label="Contiguous memory layout"></div>
+            <div id="address-ruler" class="address-ruler" aria-hidden="true"></div>
+            <div id="failure-bracket" class="failure-bracket" hidden aria-hidden="true"></div>
+          </div>
+        </div>
 
-        <!-- Memory Map / Frame Table Viewport -->
-        <div class="memory-map-container" id="viz-container"></div>
+        <!-- Paging Visualization Viewport (Textbook Table) -->
+        <div id="paging-viewport" class="paging-viewport" hidden>
+          <div id="paging-table-wrapper" class="paging-table-wrapper" role="region" aria-label="Frame replacement table">
+            <table id="paging-table" class="paging-table">
+              <thead id="paging-thead"></thead>
+              <tbody id="paging-tbody"></tbody>
+              <tfoot id="paging-tfoot"></tfoot>
+            </table>
+          </div>
+        </div>
 
-        <!-- Selected Block Inspector -->
-        <div class="inspector-card" id="inspector-container">
-          <div class="inspector-header">Selected Block</div>
-          <div style="color:var(--text-muted);font-size:0.8rem;">Click on any block in the memory map to inspect its details.</div>
+        <!-- Step Narration Sentence -->
+        <div class="narration-wrapper">
+          <p id="narration-text" class="narration-text" aria-live="polite"></p>
+        </div>
+
+        <!-- Block Detail Popover -->
+        <div id="block-popover" class="popover block-popover" hidden role="tooltip">
+          <div class="block-popover-grid">
+            <span class="popover-label">ID</span>
+            <span id="popover-id" class="popover-value mono">—</span>
+            <span class="popover-label">PID</span>
+            <span id="popover-pid" class="popover-value mono">—</span>
+            <span class="popover-label">Start</span>
+            <span id="popover-start" class="popover-value mono">—</span>
+            <span class="popover-label">Size</span>
+            <span id="popover-size" class="popover-value mono">—</span>
+            <span class="popover-label">End</span>
+            <span id="popover-end" class="popover-value mono">—</span>
+            <span class="popover-label">State</span>
+            <span id="popover-state" class="popover-value mono">—</span>
+          </div>
         </div>
       </section>
 
-      <!-- Sidebar: Metrics & Event History -->
-      <aside class="sidebar-column" aria-label="Metrics and Event History">
-        
-        <!-- Live Metrics Panel -->
-        <section class="viz-panel" style="padding:1.25rem;" aria-label="Memory Metrics">
-          <div class="panel-header" style="margin-bottom:0.75rem;">
-            <div class="panel-title" style="font-size:0.95rem;">Metrics</div>
+      <!-- Right Column: Stacked Panels -->
+      <div class="right-column">
+
+        <!-- Panel 1: Fragmentation / Faults -->
+        <section class="panel panel-metrics" aria-labelledby="heading-metrics-panel">
+          <div class="panel-header">
+            <h2 id="heading-metrics-panel" class="panel-heading">Fragmentation</h2>
           </div>
-          <div id="metrics-container" style="display:flex;flex-direction:column;gap:1rem;"></div>
+          <div class="metrics-table-wrapper">
+            <table class="metrics-table" id="metrics-table">
+              <tbody id="metrics-tbody"></tbody>
+            </table>
+          </div>
+          <div class="step-chart-container" id="step-chart-container">
+            <svg id="step-chart-svg" class="step-chart-svg" viewBox="0 0 360 120" preserveAspectRatio="none" aria-label="Step timeline chart" role="img"></svg>
+          </div>
         </section>
 
-        <!-- Event Details Panel -->
-        <section class="events-panel" aria-label="Event Details">
-          <div class="panel-header" style="margin-bottom:0.5rem;">
-            <div class="panel-title" style="font-size:0.95rem;">Step Events & Reasoning</div>
+        <!-- Panel 2: Events -->
+        <section class="panel panel-events" aria-labelledby="heading-events-panel">
+          <div class="panel-header">
+            <h2 id="heading-events-panel" class="panel-heading">Events</h2>
           </div>
-          <div id="events-container"></div>
+          <div id="events-list" class="events-list" role="log" aria-label="Step events log"></div>
         </section>
 
-      </aside>
+      </div>
 
     </div>
 
   </main>
 
-  <!-- Application Footer & Keyboard Shortcuts -->
-  <footer class="app-footer" role="contentinfo">
-    <div class="footer-container">
-      <div>MemForge Simulation Engine · Module P9 Interface</div>
-      <div class="shortcuts-legend">
-        <div class="shortcut-item"><kbd>Space</kbd> Play/Pause</div>
-        <div class="shortcut-item"><kbd>←</kbd> / <kbd>→</kbd> Step</div>
-        <div class="shortcut-item"><kbd>Home</kbd> / <kbd>r</kbd> Reset</div>
-        <div class="shortcut-item"><kbd>f</kbd> Jump to Fault</div>
-      </div>
+  <!-- Transport Bar (Fixed bottom 56px) -->
+  <footer class="transport-bar" role="toolbar" aria-label="Playback controls">
+    <div class="transport-nav">
+      <button type="button" id="btn-skip-start" class="btn btn-transport" aria-label="Skip to start" title="Skip to start (Home)">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3.5" y1="3.5" x2="3.5" y2="12.5" /><polyline points="12.5,3.5 7.5,8 12.5,12.5" /></svg>
+      </button>
+      <button type="button" id="btn-step-back" class="btn btn-transport" aria-label="Step back" title="Step back (Left arrow)">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="10,3.5 5,8 10,12.5" /></svg>
+      </button>
+      <button type="button" id="btn-play-pause" class="btn btn-play" aria-label="Play" title="Play / pause (Space)">
+        <span id="play-icon-slot">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M5 3.5 L12 8 L5 12.5 Z" /></svg>
+        </span>
+      </button>
+      <button type="button" id="btn-step-forward" class="btn btn-transport" aria-label="Step forward" title="Step forward (Right arrow)">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6,3.5 11,8 6,12.5" /></svg>
+      </button>
+      <button type="button" id="btn-skip-end" class="btn btn-transport" aria-label="Skip to end" title="Skip to end (End)">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12.5" y1="3.5" x2="12.5" y2="12.5" /><polyline points="3.5,3.5 8.5,8 3.5,12.5" /></svg>
+      </button>
+    </div>
+
+    <div class="step-counter mono" id="step-counter" aria-label="Current step">0 / 0</div>
+
+    <div class="scrubber-wrapper">
+      <div id="scrubber-ticks" class="scrubber-ticks" aria-hidden="true"></div>
+      <input type="range" id="scrubber-range" class="scrubber-range" min="0" max="0" value="0" aria-label="Timeline scrubber">
+    </div>
+
+    <div class="speed-control">
+      <select id="speed-select" class="select-transport mono" aria-label="Playback speed">
+        <option value="2400">0.5x</option>
+        <option value="1200" selected>1x</option>
+        <option value="600">2x</option>
+        <option value="300">4x</option>
+      </select>
     </div>
   </footer>
 

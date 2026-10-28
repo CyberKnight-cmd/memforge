@@ -3,1320 +3,1468 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="MemForge P9 Trace Viewer — High-performance interactive visualization and replay dashboard for OS memory management and paging simulation traces.">
-  <title>MemForge — Trace Viewer Interface (P9)</title>
+  <title>MemForge Trace Viewer</title>
   <style>
-/* MemForge Trace Viewer (P9) Design System & Styles */
+/**
+ * MemForge Trace Viewer - Instrument Style Visual System
+ * Strictly tokenized, clean, high-density scientific visualization.
+ */
+
 :root {
-  --bg-primary: #0a0e17;
-  --bg-secondary: #111827;
-  --bg-card: rgba(19, 27, 46, 0.75);
-  --bg-card-hover: rgba(28, 40, 68, 0.85);
-  --bg-elevated: #1e293b;
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
-  --border-focus: #00d2ff;
-  
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  
-  --accent-cyan: #00d2ff;
-  --accent-blue: #3b82f6;
-  --accent-green: #10b981;
-  --accent-amber: #f59e0b;
-  --accent-red: #ef4444;
-  --accent-purple: #8b5cf6;
-  --accent-rose: #f43f5e;
-  
-  --pid-sys: #475569;
-  --pid-p0: #06b6d4;
-  --pid-p1: #10b981;
-  --pid-p2: #8b5cf6;
-  --pid-p3: #f43f5e;
-  --pid-p4: #f59e0b;
-  
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", Menlo, Monaco, Consolas, "Courier New", monospace;
-  
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-full: 9999px;
-  
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 12px -1px rgba(0, 0, 0, 0.5), 0 2px 6px -2px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 10px 25px -3px rgba(0, 0, 0, 0.6), 0 4px 10px -4px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(0, 210, 255, 0.25);
-  
-  --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  /* Theme tokens - Dark default */
+  --ground: #121316;
+  --panel: #181a1e;
+  --raised: #1f2227;
+  --rule: #2b2f36;
+  --text: #e7e9ec;
+  --muted: #9ba2ac;
+  --faint: #6b727c;
+  --accent: #f0a640;
+  --accent-ink: #121316;
+  --ok: #3fb68b;
+  --bad: #ff7849;
+  --free-hatch: #3a3f47;
+  --sys: #5c626b;
+
+  /* Process palette tokens */
+  --pid-c0: #56b4e9;
+  --pid-c1: #3fb68b;
+  --pid-c2: #e3c84a;
+  --pid-c3: #4f8fe0;
+  --pid-c4: #ff7849;
+  --pid-c5: #d38ab6;
+
+  /* PID aliases for test suites and dynamic mapping */
+  --pid-sys: var(--sys);
+  --pid-p0: var(--pid-c0);
+  --pid-p1: var(--pid-c1);
+  --pid-p2: var(--pid-c2);
+  --pid-p3: var(--pid-c3);
+  --pid-p4: var(--pid-c4);
+  --pid-p5: var(--pid-c5);
+
+  --block-label-text: var(--ground);
+
+  /* Typography */
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* Motion */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-ui: 160ms;
+  --dur-mem: 380ms;
 }
 
+[data-theme="light"] {
+  --ground: #f6f5f2;
+  --panel: #ffffff;
+  --raised: #efeeea;
+  --rule: #d8d7d2;
+  --text: #17181b;
+  --muted: #555b63;
+  --faint: #8a9099;
+  --accent: #b26a00;
+  --accent-ink: #ffffff;
+  --ok: #0b8a5f;
+  --bad: #c94a12;
+  --free-hatch: #c9c8c2;
+  --sys: #9aa0a8;
+
+  --pid-c0: #2f86c4;
+  --pid-c1: #0b8a5f;
+  --pid-c2: #a68a00;
+  --pid-c3: #1f5fb4;
+  --pid-c4: #c94a12;
+  --pid-c5: #a6527f;
+
+  --block-label-text: #ffffff;
+}
+
+@media print {
+  :root {
+    --ground: #f6f5f2;
+    --panel: #ffffff;
+    --raised: #efeeea;
+    --rule: #d8d7d2;
+    --text: #17181b;
+    --muted: #555b63;
+    --faint: #8a9099;
+    --accent: #b26a00;
+    --accent-ink: #ffffff;
+    --ok: #0b8a5f;
+    --bad: #c94a12;
+    --free-hatch: #c9c8c2;
+    --sys: #9aa0a8;
+
+    --pid-c0: #2f86c4;
+    --pid-c1: #0b8a5f;
+    --pid-c2: #a68a00;
+    --pid-c3: #1f5fb4;
+    --pid-c4: #c94a12;
+    --pid-c5: #a6527f;
+
+    --block-label-text: #ffffff;
+  }
+
+  .transport-bar,
+  .btn-top,
+  .select-top,
+  .popover {
+    display: none !important;
+  }
+
+  body {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}
+
+/* Base Reset & Browser Surfaces */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-body {
-  font-family: var(--font-sans);
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  line-height: 1.5;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-image: 
-    radial-gradient(ellipse at 15% 0%, rgba(0, 210, 255, 0.08) 0%, transparent 60%),
-    radial-gradient(ellipse at 85% 10%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 100%, rgba(16, 185, 129, 0.04) 0%, transparent 50%);
-  background-attachment: fixed;
-  -webkit-font-smoothing: antialiased;
-}
-
-/* Header & Navigation */
-.app-header {
-  background: rgba(17, 24, 39, 0.85);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border-subtle);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  padding: 0.75rem 1.5rem;
-}
-
-.header-container {
-  max-width: 1440px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.brand-section {
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
-}
-
-.brand-logo {
-  font-size: 1.35rem;
-  font-weight: 800;
-  letter-spacing: -0.025em;
-  background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 50%, #905cf6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.brand-badge {
-  background: rgba(0, 210, 255, 0.12);
-  color: var(--accent-cyan);
-  border: 1px solid rgba(0, 210, 255, 0.3);
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 0.2rem 0.5rem;
-  border-radius: var(--radius-full);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.trace-meta-pills {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.meta-pill {
-  font-size: 0.75rem;
-  font-family: var(--font-mono);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-subtle);
-  padding: 0.25rem 0.6rem;
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-}
-
-.meta-pill strong {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.meta-pill.subsystem-contiguous {
-  border-color: rgba(0, 210, 255, 0.4);
-  background: rgba(0, 210, 255, 0.1);
-  color: var(--accent-cyan);
-}
-
-.meta-pill.subsystem-paging {
-  border-color: rgba(139, 92, 246, 0.4);
-  background: rgba(139, 92, 246, 0.1);
-  color: var(--accent-purple);
-}
-
-/* Main Layout */
-.app-main {
-  max-width: 1440px;
+html, body {
   width: 100%;
-  margin: 0 auto;
-  padding: 1.5rem;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--ground);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.45;
+  caret-color: var(--accent);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Banners & Alerts */
-.banner {
-  padding: 0.875rem 1.25rem;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: flex-start;
-  gap: 0.875rem;
-  font-size: 0.875rem;
-  margin-bottom: 0.5rem;
-  animation: slideDown 0.3s ease;
+body {
+  display: grid;
+  grid-template-rows: 48px 1fr 56px;
+  min-width: 1024px;
 }
 
-.banner-warning {
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  color: #fde68a;
+::selection {
+  background-color: var(--accent);
+  color: var(--accent-ink);
 }
 
-.banner-error {
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  color: #fca5a5;
-}
-
-.banner-icon {
-  font-size: 1.15rem;
-  flex-shrink: 0;
-  line-height: 1;
-}
-
-.banner-content {
-  flex: 1;
-}
-
-.banner-title {
-  font-weight: 700;
-  margin-bottom: 0.2rem;
-}
-
-/* Trace Loader Bar */
-.loader-panel {
-  background: var(--bg-card);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 1.25rem 1.5rem;
-  box-shadow: var(--shadow-md);
-}
-
-.loader-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.file-input-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.file-input-hidden {
-  display: none;
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  font-family: var(--font-sans);
-  font-size: 0.875rem;
-  font-weight: 600;
-  padding: 0.55rem 1.1rem;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: var(--transition);
-  outline: none;
-  user-select: none;
-}
-
-.btn:focus-visible {
-  outline: 2px solid var(--border-focus);
+:focus-visible {
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-.btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  pointer-events: none;
+/* Thin Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
 }
 
-.btn-primary {
-  background: linear-gradient(135deg, #00d2ff 0%, #0088cc 100%);
-  color: #051626;
-  font-weight: 700;
-  box-shadow: 0 2px 8px rgba(0, 210, 255, 0.3);
-}
-
-.btn-primary:hover:not(:disabled) {
-  box-shadow: 0 4px 14px rgba(0, 210, 255, 0.5);
-  transform: translateY(-1px);
-}
-
-.btn-secondary {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--border-subtle);
-  color: var(--text-primary);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: var(--border-strong);
-}
-
-.btn-accent {
-  background: rgba(245, 158, 11, 0.15);
-  border-color: rgba(245, 158, 11, 0.4);
-  color: #fde68a;
-}
-
-.btn-accent:hover:not(:disabled) {
-  background: rgba(245, 158, 11, 0.25);
-}
-
-.sample-traces-group {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.sample-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-right: 0.25rem;
-}
-
-.btn-pill {
-  font-size: 0.75rem;
-  padding: 0.35rem 0.75rem;
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-}
-
-.btn-pill:hover {
-  background: rgba(0, 210, 255, 0.12);
-  border-color: rgba(0, 210, 255, 0.3);
-  color: var(--accent-cyan);
-}
-
-/* Playback Toolbar */
-.playback-bar {
-  background: var(--bg-card);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 1.25rem 1.5rem;
-  box-shadow: var(--shadow-md);
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.playback-controls-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.step-counter-box {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-}
-
-.step-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.step-display {
-  font-family: var(--font-mono);
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: var(--text-primary);
-}
-
-.step-total {
-  font-family: var(--font-mono);
-  font-size: 0.95rem;
-  color: var(--text-muted);
-}
-
-.transport-buttons {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.btn-icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  padding: 0;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-primary);
-  font-size: 0.95rem;
-}
-
-.btn-icon:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: var(--border-strong);
-  color: var(--accent-cyan);
-}
-
-.btn-play-pause {
-  width: 3rem;
-  height: 2.5rem;
-  background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
-  color: #061524;
-  border: none;
-  font-size: 1.15rem;
-  font-weight: 800;
-}
-
-.btn-play-pause:hover:not(:disabled) {
-  box-shadow: 0 0 16px rgba(0, 210, 255, 0.4);
-  color: #000;
-}
-
-.playback-options {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.speed-control {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-.select-dropdown {
-  background: #162032;
-  color: var(--text-primary);
-  border: 1px solid var(--border-subtle);
-  padding: 0.35rem 0.6rem;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-sans);
-  font-size: 0.8rem;
-  outline: none;
-  cursor: pointer;
-}
-
-.select-dropdown:focus {
-  border-color: var(--border-focus);
-}
-
-/* Scrubber Slider */
-.scrubber-container {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  width: 100%;
-}
-
-.scrub-slider {
-  flex: 1;
-  -webkit-appearance: none;
-  appearance: none;
-  height: 8px;
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.1);
-  outline: none;
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.scrub-slider:hover {
-  background: rgba(255, 255, 255, 0.18);
-}
-
-.scrub-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--accent-cyan);
-  cursor: pointer;
-  box-shadow: 0 0 10px rgba(0, 210, 255, 0.6);
-  transition: transform 0.1s ease;
-}
-
-.scrub-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.25);
-}
-
-.scrub-slider::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border: none;
-  border-radius: 50%;
-  background: var(--accent-cyan);
-  cursor: pointer;
-  box-shadow: 0 0 10px rgba(0, 210, 255, 0.6);
-}
-
-/* Dashboard Grid */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 1fr 380px;
-  gap: 1.5rem;
-}
-
-@media (max-width: 1080px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Visualization Panel */
-.viz-panel {
-  background: var(--bg-card);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
-  box-shadow: var(--shadow-md);
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.panel-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.panel-subtitle {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-/* Contiguous Memory Map Visualization */
-.memory-map-container {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.ruler-container {
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  padding: 0 2px;
-}
-
-.memory-bar-wrapper {
-  background: rgba(15, 23, 42, 0.9);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  padding: 6px;
-  overflow-x: auto;
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6);
-}
-
-.memory-bar {
-  display: flex;
-  height: 72px;
-  min-width: 100%;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  position: relative;
-  background: #090e18;
-}
-
-.mem-block {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 0 4px;
-  cursor: pointer;
-  transition: transform 0.15s ease, filter 0.15s ease;
-  position: relative;
-  border-right: 1px solid rgba(0, 0, 0, 0.5);
-  user-select: none;
-  min-width: 18px; /* Ensure tiny blocks remain visible and clickable! */
-}
-
-.mem-block:hover {
-  filter: brightness(1.25);
-  z-index: 10;
-}
-
-.mem-block.selected {
-  outline: 2px solid #fff;
-  outline-offset: -2px;
-  z-index: 20;
-}
-
-.mem-block.highlight-step {
-  animation: pulseBlock 1.5s infinite alternate;
-}
-
-@keyframes pulseBlock {
-  0% { box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.4); }
-  100% { box-shadow: inset 0 0 20px rgba(0, 210, 255, 0.8); }
-}
-
-.mem-block-free {
-  background-color: #1e293b;
-  background-image: repeating-linear-gradient(
-    45deg,
-    rgba(255, 255, 255, 0.03),
-    rgba(255, 255, 255, 0.03) 6px,
-    transparent 6px,
-    transparent 12px
-  );
-  color: var(--text-muted);
-}
-
-.mem-block-allocated {
-  color: #ffffff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-.block-label-id {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.block-label-size {
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  opacity: 0.85;
-  white-space: nowrap;
-}
-
-/* Block Inspector Card */
-.inspector-card {
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 1rem;
-}
-
-.inspector-header {
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  margin-bottom: 0.75rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.inspector-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 0.75rem;
-}
-
-.inspector-item {
-  display: flex;
-  flex-direction: column;
-}
-
-.inspector-label {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-}
-
-.inspector-val {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-/* Compaction Relocation Banner */
-.compaction-notice {
-  background: rgba(139, 92, 246, 0.12);
-  border: 1px solid rgba(139, 92, 246, 0.35);
-  border-radius: var(--radius-md);
-  padding: 0.75rem 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 0.8rem;
-  color: #ddd6fe;
-}
-
-/* Paging Grid Visualization */
-.paging-container {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.frame-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 0.875rem;
-}
-
-.frame-card {
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  transition: var(--transition);
-  position: relative;
-}
-
-.frame-card.active-access {
-  border-color: var(--accent-cyan);
-  box-shadow: 0 0 16px rgba(0, 210, 255, 0.3);
-}
-
-.frame-card.evicted {
-  border-color: var(--accent-red);
-  background: rgba(239, 68, 68, 0.1);
-}
-
-.frame-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.75rem;
-  font-weight: 700;
-  font-family: var(--font-mono);
-}
-
-.frame-num {
-  color: var(--accent-cyan);
-}
-
-.frame-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #475569;
-}
-
-.frame-status-dot.occupied {
-  background: var(--accent-green);
-  box-shadow: 0 0 6px var(--accent-green);
-}
-
-.frame-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.frame-page-id {
-  font-family: var(--font-mono);
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.frame-bits {
-  display: flex;
-  gap: 0.4rem;
-  font-size: 0.65rem;
-  font-family: var(--font-mono);
-}
-
-.bit-badge {
-  padding: 0.1rem 0.3rem;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-muted);
-}
-
-.bit-badge.active {
-  background: rgba(0, 210, 255, 0.2);
-  color: var(--accent-cyan);
-  font-weight: 700;
-}
-
-.bit-badge.dirty {
-  background: rgba(245, 158, 11, 0.2);
-  color: var(--accent-amber);
-  font-weight: 700;
-}
-
-/* Page Tables Section */
-.page-table-wrapper {
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 1rem;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.8rem;
-  font-family: var(--font-mono);
-}
-
-.data-table th {
-  text-align: left;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  font-weight: 600;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-}
-
-.data-table td {
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  color: var(--text-secondary);
-}
-
-.data-table tr:hover td {
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--text-primary);
-}
-
-/* Policy State Display */
-.policy-state-box {
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.queue-chips {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.queue-chip {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  padding: 0.25rem 0.6rem;
-  border-radius: var(--radius-sm);
-  background: rgba(139, 92, 246, 0.15);
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  color: #ddd6fe;
-}
-
-/* Side Panels: Metrics & Events */
-.sidebar-column {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.metric-card-group {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.875rem;
-}
-
-.metric-card {
-  background: var(--bg-card);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 1rem;
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  transition: var(--transition);
-}
-
-.metric-card:hover {
-  border-color: var(--border-strong);
-  transform: translateY(-1px);
-}
-
-.metric-title {
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-}
-
-.metric-number {
-  font-family: var(--font-mono);
-  font-size: 1.35rem;
-  font-weight: 800;
-  color: var(--text-primary);
-}
-
-.metric-sub {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-}
-
-.metric-gauge {
-  height: 4px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 2px;
-  overflow: hidden;
-  margin-top: 0.25rem;
-}
-
-.gauge-fill {
-  height: 100%;
-  border-radius: 2px;
-  transition: width 0.3s ease;
-}
-
-/* Trend Chart */
-.trend-card {
-  background: var(--bg-card);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.sparkline-svg {
-  width: 100%;
-  height: 64px;
-  overflow: visible;
-}
-
-/* Event Details Panel */
-.events-panel {
-  background: var(--bg-card);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 1.25rem;
-  box-shadow: var(--shadow-md);
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.step-summary-banner {
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.04);
-  border-left: 3px solid var(--accent-cyan);
-  font-size: 0.85rem;
-}
-
-.step-summary-banner.failure {
-  border-left-color: var(--accent-red);
-  background: rgba(239, 68, 68, 0.08);
-}
-
-.step-summary-banner.hit {
-  border-left-color: var(--accent-green);
-  background: rgba(16, 185, 129, 0.08);
-}
-
-.step-summary-title {
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 0.2rem;
-}
-
-.step-summary-desc {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  line-height: 1.4;
-}
-
-.events-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  max-height: 380px;
-  overflow-y: auto;
-  padding-right: 0.25rem;
-}
-
-.event-item {
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 0.65rem 0.85rem;
-  font-size: 0.8rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.event-item-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.event-chip {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 0.15rem 0.5rem;
-  border-radius: var(--radius-full);
-}
-
-.chip-PlacementDecided { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
-.chip-BlockAllocated { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
-.chip-BlockSplit { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; }
-.chip-AllocationFailed { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
-.chip-BlockFreed { background: rgba(245, 158, 11, 0.2); color: #fde68a; }
-.chip-BlocksCoalesced { background: rgba(14, 165, 233, 0.2); color: #7dd3fc; }
-.chip-CompactionStarted { background: rgba(168, 85, 247, 0.2); color: #d8b4fe; }
-.chip-BlockRelocated { background: rgba(217, 70, 239, 0.2); color: #f0abfc; }
-.chip-CompactionCompleted { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
-.chip-PageHit { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
-.chip-PageFault { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
-.chip-PageLoaded { background: rgba(14, 165, 233, 0.2); color: #7dd3fc; }
-.chip-PageEvicted { background: rgba(245, 158, 11, 0.2); color: #fde68a; }
-.chip-PageWrittenBack { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
-.chip-VictimSelected { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; }
-.chip-ProcessSpawned { background: rgba(100, 116, 139, 0.2); color: #cbd5e1; }
-
-.event-seq {
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  color: var(--text-muted);
-}
-
-.event-params {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  word-break: break-all;
-}
-
-/* Empty State */
-.empty-state {
-  text-align: center;
-  padding: 4rem 2rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.25rem;
-  color: var(--text-secondary);
-}
-
-.empty-icon {
-  font-size: 3.5rem;
-  line-height: 1;
-  opacity: 0.5;
-}
-
-.empty-title {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.empty-desc {
-  max-width: 480px;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  line-height: 1.5;
-}
-
-/* Footer & Keyboard Legend */
-.app-footer {
-  margin-top: auto;
-  border-top: 1px solid var(--border-subtle);
-  padding: 1.25rem 1.5rem;
-  background: rgba(11, 15, 23, 0.95);
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.footer-container {
-  max-width: 1440px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.shortcuts-legend {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.shortcut-item {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-kbd {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  padding: 0.15rem 0.4rem;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-}
-
-/* Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--rule);
   border-radius: 3px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+/* Monospace Helpers */
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Animations */
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Button & Select Base Tokens */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: background var(--dur-ui) var(--ease), color var(--dur-ui) var(--ease), border-color var(--dur-ui) var(--ease), filter var(--dur-ui) var(--ease);
+}
+
+.btn:hover:not(:disabled) {
+  filter: brightness(1.04);
+}
+
+[data-theme="light"] .btn:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+.btn:active:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+/* 1. Top Bar (48px) */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--rule);
+  z-index: 50;
+}
+
+.top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.brand-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.divider-rule {
+  width: 1px;
+  height: 16px;
+  background: var(--rule);
+  flex-shrink: 0;
+}
+
+.trace-name {
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+.trace-meta-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.meta-tag {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.btn-top {
+  height: 32px;
+  padding: 0 10px;
+}
+
+.select-top {
+  height: 32px;
+  padding: 0 10px;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+}
+
+.select-top:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 2. Main Viewport & Layout */
+.main-viewport {
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  overflow: hidden;
+  background: var(--ground);
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Panels */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panel-header {
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.panel-heading {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* Left Column: Memory */
+.panel-left {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.contiguous-viewport {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  position: relative;
+}
+
+.memory-stage {
+  position: relative;
+  width: 100%;
+  margin-top: 40px; /* Space for ghost bar during allocation */
+  margin-bottom: 8px;
+}
+
+.ghost-host {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.ghost-bar {
+  position: absolute;
+  height: 32px;
+  top: -38px;
+  border-radius: 3px;
+  box-sizing: border-box;
+  z-index: 10;
+  transition: left 120ms linear, top 160ms var(--ease), height 160ms var(--ease), opacity 160ms var(--ease);
+}
+
+.ghost-bar.shake {
+  animation: ghostShake 240ms ease-in-out;
+}
+
+@keyframes ghostShake {
+  0% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+  100% { transform: translateX(0); }
+}
+
+/* Memory Strip (88px) */
+.memory-strip {
+  position: relative;
+  width: 100%;
+  height: 88px;
+  background-color: var(--ground);
+  background-image: repeating-linear-gradient(135deg, var(--free-hatch) 0 1px, transparent 1px 7px);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+/* Memory Blocks */
+.mem-block {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  container-type: inline-size;
+  transition: opacity var(--dur-mem) var(--ease), outline-color var(--dur-ui) var(--ease);
+}
+
+.mem-block-free {
+  background-color: var(--ground);
+  background-image: repeating-linear-gradient(135deg, var(--free-hatch) 0 1px, transparent 1px 7px);
+  cursor: pointer;
+}
+
+.mem-block-free.hole-failed {
+  outline: 2px solid var(--bad);
+  outline-offset: -2px;
+}
+
+.mem-block-allocated {
+  background-color: color-mix(in srgb, var(--block-color, var(--sys)) 85%, transparent);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.mem-block-allocated:hover,
+.mem-block-allocated:focus-visible {
+  filter: brightness(1.1);
+}
+
+.block-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--block-label-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Hide labels inside allocated blocks when width <= 56px */
+@container (max-width: 56px) {
+  .block-label {
+    display: none;
+  }
+}
+
+.block-relocate-tag {
+  position: absolute;
+  top: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  background: var(--raised);
+  padding: 1px 3px;
+  border-radius: 2px;
+  border: 1px solid var(--accent);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Address Ruler */
+.address-ruler {
+  position: relative;
+  width: 100%;
+  height: 24px;
+  border-top: 1px solid var(--rule);
+  margin-top: 1px;
+}
+
+.ruler-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.ruler-tick-line {
+  width: 1px;
+  height: 5px;
+  background: var(--rule);
+}
+
+.ruler-tick-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.ruler-tick-hover {
+  z-index: 5;
+}
+
+.ruler-tick-hover .ruler-tick-line {
+  height: 8px;
+  background: var(--accent);
+}
+
+.ruler-tick-hover .ruler-tick-label {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Failure Bracket under strip */
+.failure-bracket {
+  position: relative;
+  width: 100%;
+  height: 24px;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bracket-svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Narration sentence */
+.narration-wrapper {
+  margin-top: 20px;
+  padding: 4px 0;
+  min-height: 56px;
+}
+
+.narration-text {
+  font-size: 18px;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.narrate-num,
+.narrate-id,
+.narrate-pid {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Popovers: the ONLY shadow allowed: 0 8px 24px rgb(0 0 0 / .35) */
+.popover {
+  position: absolute;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / .35);
+  z-index: 1000;
+}
+
+.block-popover {
+  padding: 8px 12px;
+  min-width: 160px;
+  pointer-events: none;
+}
+
+.block-popover-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  row-gap: 4px;
+  column-gap: 12px;
+  font-size: 12px;
+}
+
+.popover-label {
+  color: var(--muted);
+  text-align: left;
+}
+
+.popover-value {
+  color: var(--text);
+  text-align: right;
+  font-weight: 500;
+}
+
+.keyboard-popover {
+  top: 40px;
+  right: 0;
+  padding: 16px;
+  width: 290px;
+}
+
+.popover-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.shortcut-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.shortcut-key {
+  padding: 2px 6px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--accent);
+}
+
+.shortcut-desc {
+  color: var(--muted);
+}
+
+/* Paging Textbook Replacement Table */
+.paging-viewport {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.paging-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.paging-table {
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+}
+
+.paging-th-corner {
+  width: 72px;
+  min-width: 72px;
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  background: var(--raised);
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+
+.paging-th-ref {
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  padding: 6px 0;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  background: var(--raised);
+}
+
+.paging-th-ref.current-col {
+  border-top: 2px solid var(--accent);
+  color: var(--accent);
+}
+
+.paging-td-label {
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  background: var(--raised);
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  white-space: nowrap;
+}
+
+.paging-cell {
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  height: 36px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  border-bottom: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  position: relative;
+  vertical-align: middle;
+}
+
+.paging-cell.current-col {
+  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
+}
+
+.paging-cell.cell-slide-in {
+  animation: cellSlideDown 160ms var(--ease);
+}
+
+@keyframes cellSlideDown {
+  from {
+    transform: translateY(-12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.paging-cell.cell-fault-loaded {
+  outline: 2px solid var(--bad);
+  outline-offset: -2px;
+}
+
+.paging-cell.cell-hit {
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.evicted-strike {
+  text-decoration: line-through;
+  color: var(--faint);
+  font-size: 11px;
+  margin-right: 2px;
+}
+
+.paging-marker-cell {
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  height: 28px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  border-right: 1px solid var(--rule);
+  vertical-align: middle;
+}
+
+.paging-marker-fault {
+  color: var(--bad);
+}
+
+.paging-marker-hit {
+  color: var(--ok);
+}
+
+/* Right Column (Stacked Panels) */
+.right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.panel-metrics {
+  flex: 0 0 auto;
+}
+
+.metrics-table-wrapper {
+  margin-bottom: 12px;
+}
+
+.metrics-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.metrics-table tr {
+  height: 24px;
+}
+
+.metric-label {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: left;
+  padding: 2px 0;
+}
+
+.metric-value-cell {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  text-align: right;
+  padding: 2px 0;
+  white-space: nowrap;
+}
+
+.metric-val {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.delta {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  margin-left: 6px;
+  transition: opacity 0.4s var(--ease);
+  opacity: 1;
+}
+
+.delta.fade-out {
+  opacity: 0;
+}
+
+.delta-ok {
+  color: var(--ok);
+}
+
+.delta-bad {
+  color: var(--bad);
+}
+
+/* Step Timeline Chart (120px) */
+.step-chart-container {
+  width: 100%;
+  height: 120px;
+  position: relative;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.step-chart-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Panel Events (Scrollable Log) */
+.panel-events {
+  flex: 1 1 0;
+  min-height: 120px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.events-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.event-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--rule) 50%, transparent);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.event-seq {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+  min-width: 28px;
+  flex-shrink: 0;
+}
+
+.event-name {
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.event-fields {
+  font-family: var(--mono);
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 4. Transport Bar (Fixed Bottom 56px) */
+.transport-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 56px;
+  padding: 0 16px;
+  background: var(--panel);
+  border-top: 1px solid var(--rule);
+  z-index: 50;
+}
+
+.transport-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-transport {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.btn-play {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: filter var(--dur-ui) var(--ease);
+}
+
+.btn-play:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.btn-play:active:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+.step-counter {
+  font-size: 13px;
+  color: var(--text);
+  min-width: 58px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.scrubber-wrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 24px;
+}
+
+.scrubber-ticks {
+  position: absolute;
+  top: 10px;
+  left: 7px;
+  right: 7px;
+  height: 4px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.scrubber-tick-item {
+  position: absolute;
+  width: 2px;
+  height: 4px;
+  transform: translateX(-50%);
+}
+
+.scrubber-tick-item.tick-bad {
+  background: var(--bad);
+}
+
+.scrubber-tick-item.tick-accent {
+  background: var(--accent);
+}
+
+.scrubber-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 24px;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
+  margin: 0;
+}
+
+.scrubber-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--track-bg, var(--rule));
+}
+
+.scrubber-range::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--track-bg, var(--rule));
+}
+
+.scrubber-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  margin-top: -5px; /* (4 - 14) / 2 */
+  transition: transform var(--dur-ui) var(--ease);
+}
+
+.scrubber-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+}
+
+.scrubber-range:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+.speed-control {
+  display: flex;
+  align-items: center;
+}
+
+.select-transport {
+  height: 32px;
+  padding: 0 8px;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.select-transport:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 5. Empty State (Centered Block) */
+.empty-state {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-card {
+  max-width: 520px;
+  width: 100%;
+  padding: 32px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.empty-heading {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.empty-description {
+  font-size: 15px;
+  color: var(--muted);
+  line-height: 1.45;
+  margin-bottom: 24px;
+}
+
+.btn-primary {
+  height: 40px;
+  padding: 0 20px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: none;
+  margin: 0 auto 24px auto;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.sample-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.btn-sample-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: filter var(--dur-ui) var(--ease), border-color var(--dur-ui) var(--ease);
+}
+
+.btn-sample-card:hover {
+  filter: brightness(1.04);
+  border-color: var(--accent);
+}
+
+[data-theme="light"] .btn-sample-card:hover {
+  filter: brightness(0.96);
+  border-color: var(--accent);
+}
+
+.sample-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.sample-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.load-error {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--bad);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bad) 8%, transparent);
+  color: var(--bad);
+  font-size: 12px;
+  text-align: left;
+}
+
+/* Reduced Motion Mode */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 120ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 120ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  .ghost-bar.shake {
+    animation: none !important;
+  }
+
+  .paging-cell.cell-slide-in {
+    animation: none !important;
+  }
+}
+
+/* Responsive Stacking below 1024px */
+@media (max-width: 1023px) {
+  body {
+    grid-template-rows: 48px auto 56px;
+    height: auto;
+    overflow-y: auto;
+    min-width: 0;
+  }
+
+  .main-viewport {
+    height: auto;
+    overflow: visible;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .panel-left {
+    min-height: 380px;
+  }
+
+  .right-column {
+    height: auto;
+  }
 }
 
 </style>
 </head>
 <body>
 
-  <!-- Top Application Header -->
-  <header class="app-header" role="banner">
-    <div class="header-container">
-      <div class="brand-section">
-        <h1 class="brand-logo">
-          <span>⚡ MemForge</span>
-        </h1>
-        <span class="brand-badge">P9 Trace Viewer</span>
+  <!-- Top bar 48px -->
+  <header class="top-bar" role="banner">
+    <div class="top-bar-left">
+      <span class="brand-title">MemForge</span>
+      <div class="divider-rule" aria-hidden="true"></div>
+      <span id="trace-name" class="trace-name mono">—</span>
+      <div id="trace-meta-tags" class="trace-meta-tags">
+        <span id="meta-policy" class="meta-tag">policy —</span>
+        <span id="meta-config" class="meta-tag">—</span>
       </div>
+    </div>
 
-      <div class="trace-meta-pills" id="trace-meta-pills" aria-label="Trace Metadata">
-        <span class="meta-pill" id="meta-workload">Workload: <strong>—</strong></span>
-        <span class="meta-pill" id="meta-policy">Policy: <strong>—</strong></span>
-        <span class="meta-pill subsystem-contiguous" id="meta-subsystem">Mode: <strong>CONTIGUOUS</strong></span>
-        <span class="meta-pill" id="meta-config">Config: <strong>—</strong></span>
+    <div class="top-bar-right">
+      <input type="file" id="file-input" class="visually-hidden" accept=".jsonl,.trace,.json,.txt" aria-label="Open trace file">
+      <button type="button" id="btn-open-file" class="btn btn-top" aria-label="Open trace file">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5 C2 3.7 2.7 3 3.5 3 H6 L7.5 5 H12.5 C13.3 5 14 5.7 14 6.5 V11.5 C14 12.3 13.3 13 12.5 13 H3.5 C2.7 13 2 12.3 2 11.5 Z" /></svg>
+        <span>Open trace</span>
+      </button>
+
+      <select id="sample-select" class="select-top" aria-label="Sample traces">
+        <option value="" disabled selected>Sample traces</option>
+        <option value="ac1">AC-1 First-Fit</option>
+        <option value="ac2">AC-2 Compaction</option>
+        <option value="ac3">AC-3 Paging FIFO</option>
+      </select>
+
+      <button type="button" id="btn-theme-toggle" class="btn btn-top btn-icon" aria-label="Toggle theme">
+        <span id="theme-icon-slot">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3" /><line x1="8" y1="1.5" x2="8" y2="3" /><line x1="8" y1="13" x2="8" y2="14.5" /><line x1="1.5" y1="8" x2="3" y2="8" /><line x1="13" y1="8" x2="14.5" y2="8" /><line x1="3.4" y1="3.4" x2="4.5" y2="4.5" /><line x1="11.5" y1="11.5" x2="12.6" y2="12.6" /><line x1="3.4" y1="12.6" x2="4.5" y2="11.5" /><line x1="11.5" y1="4.5" x2="12.6" y2="3.4" /></svg>
+        </span>
+      </button>
+
+      <button type="button" id="btn-keyboard-help" class="btn btn-top btn-icon" aria-label="Keyboard shortcuts" aria-haspopup="dialog" aria-expanded="false">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3.5" width="12" height="9" rx="1.5" /><line x1="4.5" y1="6" x2="5.5" y2="6" /><line x1="7.5" y1="6" x2="8.5" y2="6" /><line x1="10.5" y1="6" x2="11.5" y2="6" /><line x1="5.5" y1="9" x2="10.5" y2="9" /></svg>
+      </button>
+
+      <!-- Keyboard Help Popover -->
+      <div id="keyboard-popover" class="popover keyboard-popover" role="dialog" aria-label="Keyboard shortcuts" hidden>
+        <div class="popover-title">Keyboard shortcuts</div>
+        <div class="shortcut-list">
+          <div class="shortcut-row"><span class="shortcut-key mono">Space</span><span class="shortcut-desc">Play / pause</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">&larr; / &rarr;</span><span class="shortcut-desc">Step back / step forward</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">Home / End</span><span class="shortcut-desc">Skip to start / skip to end</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">T</span><span class="shortcut-desc">Toggle dark / light theme</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">?</span><span class="shortcut-desc">Show / hide this help</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">Esc</span><span class="shortcut-desc">Close popovers</span></div>
+        </div>
       </div>
     </div>
   </header>
 
-  <!-- Notification Banner Container -->
-  <div id="notification-container" style="max-width:1440px;width:100%;margin:1rem auto 0;padding:0 1.5rem;" role="alert" aria-live="polite"></div>
+  <!-- Main Viewport Area -->
+  <main class="main-viewport" role="main">
 
-  <!-- Main Viewport -->
-  <main class="app-main" role="main">
+    <!-- Empty State (when no trace loaded) -->
+    <div id="empty-state" class="empty-state">
+      <div class="empty-card">
+        <h1 class="empty-heading">Open a MemForge trace</h1>
+        <p class="empty-description">Drop a .jsonl file produced by memsim, or start with a sample.</p>
+        <button type="button" id="btn-empty-open" class="btn btn-primary" aria-label="Open trace">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5 C2 3.7 2.7 3 3.5 3 H6 L7.5 5 H12.5 C13.3 5 14 5.7 14 6.5 V11.5 C14 12.3 13.3 13 12.5 13 H3.5 C2.7 13 2 12.3 2 11.5 Z" /></svg>
+          <span>Open trace</span>
+        </button>
 
-    <!-- Trace Loading Section -->
-    <section class="loader-panel" aria-label="Trace Loading Controls">
-      <div class="loader-row">
-        <div class="file-input-wrapper" id="trace-dropzone">
-          <input type="file" id="trace-file-input" class="file-input-hidden" accept=".jsonl,.trace,.json,.txt" aria-label="Select Trace File">
-          <button type="button" class="btn btn-primary" id="btn-load-file">
-            📁 Open Trace File
+        <div class="sample-list" aria-label="Sample Traces">
+          <button type="button" class="btn-sample-card" data-sample="ac1">
+            <span class="sample-title mono">AC-1 First-Fit</span>
+            <span class="sample-desc">Silberschatz 5 holes with external fragmentation failure</span>
           </button>
-          <span style="font-size:0.8rem;color:var(--text-muted);">or drag & drop a .jsonl trace here</span>
-        </div>
-
-        <div class="sample-traces-group">
-          <span class="sample-label">Quick Samples:</span>
-          <button type="button" class="btn btn-pill" id="btn-sample-ac1" title="AC-1 First-Fit fragmentation failure on Silberschatz 5 holes">AC-1 First-Fit</button>
-          <button type="button" class="btn btn-pill" id="btn-sample-ac2" title="AC-2 Sliding compaction and retry of 426 allocation">AC-2 Compaction</button>
-          <button type="button" class="btn btn-pill" id="btn-sample-ac3" title="AC-3 Paging reference string with 3 frames and FIFO replacement">AC-3 Paging FIFO</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- Playback Control Toolbar -->
-    <section class="playback-bar" aria-label="Trace Playback Controls">
-      <div class="playback-controls-row">
-        <div class="step-counter-box">
-          <span class="step-label">Step</span>
-          <span class="step-display" id="step-display">0</span>
-          <span class="step-total" id="step-total">/ 0</span>
-        </div>
-
-        <div class="transport-buttons">
-          <button type="button" class="btn btn-icon" id="btn-reset" title="Reset to start (Home or r)" aria-label="Reset to start">⏮</button>
-          <button type="button" class="btn btn-icon" id="btn-prev" title="Previous step (Left Arrow or k)" aria-label="Previous step">◀</button>
-          <button type="button" class="btn btn-play-pause" id="btn-play" title="Play / Pause (Space)" aria-label="Play or Pause">▶</button>
-          <button type="button" class="btn btn-icon" id="btn-next" title="Next step (Right Arrow or j)" aria-label="Next step">▶</button>
-          <button type="button" class="btn btn-accent" id="btn-failure" title="Jump to next allocation failure or page fault (f)" style="margin-left:0.5rem;font-size:0.75rem;">
-            ⚠ Next Fault
+          <button type="button" class="btn-sample-card" data-sample="ac2">
+            <span class="sample-title mono">AC-2 Compaction</span>
+            <span class="sample-desc">Sliding compaction resolving fragmentation and retrying request</span>
+          </button>
+          <button type="button" class="btn-sample-card" data-sample="ac3">
+            <span class="sample-title mono">AC-3 Paging FIFO</span>
+            <span class="sample-desc">Paging reference string across 3 physical frames with FIFO replacement</span>
           </button>
         </div>
 
-        <div class="playback-options">
-          <div class="speed-control">
-            <label for="playback-speed">Speed:</label>
-            <select id="playback-speed" class="select-dropdown">
-              <option value="1000">0.5x (1000ms)</option>
-              <option value="500" selected>1.0x (500ms)</option>
-              <option value="250">2.0x (250ms)</option>
-              <option value="100">5.0x (100ms)</option>
-              <option value="50">10.0x (50ms)</option>
-            </select>
-          </div>
-        </div>
+        <div id="load-error-message" class="load-error mono" hidden role="alert"></div>
       </div>
-
-      <div class="scrubber-container">
-        <input type="range" id="scrub-slider" class="scrub-slider" min="0" max="0" value="0" aria-label="Trace Step Scrubber">
-      </div>
-    </section>
-
-    <!-- Empty State -->
-    <div class="empty-state" id="empty-state">
-      <div class="empty-icon">📊</div>
-      <div class="empty-title">No Trace Loaded</div>
-      <p class="empty-desc">
-        Load a MemForge simulator trace file (<code>.jsonl</code>) or choose one of the quick samples above to begin replaying memory allocation and paging events.
-      </p>
     </div>
 
-    <!-- Main Dashboard Grid -->
-    <div class="dashboard-grid" id="dashboard-grid" style="display:none;">
+    <!-- Active Dashboard Grid (2fr / 1fr) -->
+    <div id="dashboard-grid" class="dashboard-grid" hidden>
 
-      <!-- Primary Visualization (Memory Map or Frame Grid) -->
-      <section class="viz-panel" aria-label="Memory Subsystem Visualization">
+      <!-- Left Column: Memory / Frames -->
+      <section class="panel panel-left" aria-labelledby="heading-memory-panel">
         <div class="panel-header">
-          <div class="panel-title">
-            <span>Memory Layout</span>
-          </div>
-          <div class="panel-subtitle" id="viz-subtitle">Snapshot State</div>
+          <h2 id="heading-memory-panel" class="panel-heading">Memory</h2>
         </div>
 
-        <!-- Address Ruler -->
-        <div class="ruler-container" id="ruler-container" aria-hidden="true"></div>
+        <!-- Contiguous Visualization Viewport -->
+        <div id="contiguous-viewport" class="contiguous-viewport">
+          <div class="memory-stage">
+            <div id="ghost-host" class="ghost-host" aria-hidden="true"></div>
+            <div id="memory-strip" class="memory-strip" role="region" aria-label="Contiguous memory layout"></div>
+            <div id="address-ruler" class="address-ruler" aria-hidden="true"></div>
+            <div id="failure-bracket" class="failure-bracket" hidden aria-hidden="true"></div>
+          </div>
+        </div>
 
-        <!-- Memory Map / Frame Table Viewport -->
-        <div class="memory-map-container" id="viz-container"></div>
+        <!-- Paging Visualization Viewport (Textbook Table) -->
+        <div id="paging-viewport" class="paging-viewport" hidden>
+          <div id="paging-table-wrapper" class="paging-table-wrapper" role="region" aria-label="Frame replacement table">
+            <table id="paging-table" class="paging-table">
+              <thead id="paging-thead"></thead>
+              <tbody id="paging-tbody"></tbody>
+              <tfoot id="paging-tfoot"></tfoot>
+            </table>
+          </div>
+        </div>
 
-        <!-- Selected Block Inspector -->
-        <div class="inspector-card" id="inspector-container">
-          <div class="inspector-header">Selected Block</div>
-          <div style="color:var(--text-muted);font-size:0.8rem;">Click on any block in the memory map to inspect its details.</div>
+        <!-- Step Narration Sentence -->
+        <div class="narration-wrapper">
+          <p id="narration-text" class="narration-text" aria-live="polite"></p>
+        </div>
+
+        <!-- Block Detail Popover -->
+        <div id="block-popover" class="popover block-popover" hidden role="tooltip">
+          <div class="block-popover-grid">
+            <span class="popover-label">ID</span>
+            <span id="popover-id" class="popover-value mono">—</span>
+            <span class="popover-label">PID</span>
+            <span id="popover-pid" class="popover-value mono">—</span>
+            <span class="popover-label">Start</span>
+            <span id="popover-start" class="popover-value mono">—</span>
+            <span class="popover-label">Size</span>
+            <span id="popover-size" class="popover-value mono">—</span>
+            <span class="popover-label">End</span>
+            <span id="popover-end" class="popover-value mono">—</span>
+            <span class="popover-label">State</span>
+            <span id="popover-state" class="popover-value mono">—</span>
+          </div>
         </div>
       </section>
 
-      <!-- Sidebar: Metrics & Event History -->
-      <aside class="sidebar-column" aria-label="Metrics and Event History">
-        
-        <!-- Live Metrics Panel -->
-        <section class="viz-panel" style="padding:1.25rem;" aria-label="Memory Metrics">
-          <div class="panel-header" style="margin-bottom:0.75rem;">
-            <div class="panel-title" style="font-size:0.95rem;">Metrics</div>
+      <!-- Right Column: Stacked Panels -->
+      <div class="right-column">
+
+        <!-- Panel 1: Fragmentation / Faults -->
+        <section class="panel panel-metrics" aria-labelledby="heading-metrics-panel">
+          <div class="panel-header">
+            <h2 id="heading-metrics-panel" class="panel-heading">Fragmentation</h2>
           </div>
-          <div id="metrics-container" style="display:flex;flex-direction:column;gap:1rem;"></div>
+          <div class="metrics-table-wrapper">
+            <table class="metrics-table" id="metrics-table">
+              <tbody id="metrics-tbody"></tbody>
+            </table>
+          </div>
+          <div class="step-chart-container" id="step-chart-container">
+            <svg id="step-chart-svg" class="step-chart-svg" viewBox="0 0 360 120" preserveAspectRatio="none" aria-label="Step timeline chart" role="img"></svg>
+          </div>
         </section>
 
-        <!-- Event Details Panel -->
-        <section class="events-panel" aria-label="Event Details">
-          <div class="panel-header" style="margin-bottom:0.5rem;">
-            <div class="panel-title" style="font-size:0.95rem;">Step Events & Reasoning</div>
+        <!-- Panel 2: Events -->
+        <section class="panel panel-events" aria-labelledby="heading-events-panel">
+          <div class="panel-header">
+            <h2 id="heading-events-panel" class="panel-heading">Events</h2>
           </div>
-          <div id="events-container"></div>
+          <div id="events-list" class="events-list" role="log" aria-label="Step events log"></div>
         </section>
 
-      </aside>
+      </div>
 
     </div>
 
   </main>
 
-  <!-- Application Footer & Keyboard Shortcuts -->
-  <footer class="app-footer" role="contentinfo">
-    <div class="footer-container">
-      <div>MemForge Simulation Engine · Module P9 Interface</div>
-      <div class="shortcuts-legend">
-        <div class="shortcut-item"><kbd>Space</kbd> Play/Pause</div>
-        <div class="shortcut-item"><kbd>←</kbd> / <kbd>→</kbd> Step</div>
-        <div class="shortcut-item"><kbd>Home</kbd> / <kbd>r</kbd> Reset</div>
-        <div class="shortcut-item"><kbd>f</kbd> Jump to Fault</div>
-      </div>
+  <!-- Transport Bar (Fixed bottom 56px) -->
+  <footer class="transport-bar" role="toolbar" aria-label="Playback controls">
+    <div class="transport-nav">
+      <button type="button" id="btn-skip-start" class="btn btn-transport" aria-label="Skip to start" title="Skip to start (Home)">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3.5" y1="3.5" x2="3.5" y2="12.5" /><polyline points="12.5,3.5 7.5,8 12.5,12.5" /></svg>
+      </button>
+      <button type="button" id="btn-step-back" class="btn btn-transport" aria-label="Step back" title="Step back (Left arrow)">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="10,3.5 5,8 10,12.5" /></svg>
+      </button>
+      <button type="button" id="btn-play-pause" class="btn btn-play" aria-label="Play" title="Play / pause (Space)">
+        <span id="play-icon-slot">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M5 3.5 L12 8 L5 12.5 Z" /></svg>
+        </span>
+      </button>
+      <button type="button" id="btn-step-forward" class="btn btn-transport" aria-label="Step forward" title="Step forward (Right arrow)">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6,3.5 11,8 6,12.5" /></svg>
+      </button>
+      <button type="button" id="btn-skip-end" class="btn btn-transport" aria-label="Skip to end" title="Skip to end (End)">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12.5" y1="3.5" x2="12.5" y2="12.5" /><polyline points="3.5,3.5 8.5,8 3.5,12.5" /></svg>
+      </button>
+    </div>
+
+    <div class="step-counter mono" id="step-counter" aria-label="Current step">0 / 0</div>
+
+    <div class="scrubber-wrapper">
+      <div id="scrubber-ticks" class="scrubber-ticks" aria-hidden="true"></div>
+      <input type="range" id="scrubber-range" class="scrubber-range" min="0" max="0" value="0" aria-label="Timeline scrubber">
+    </div>
+
+    <div class="speed-control">
+      <select id="speed-select" class="select-transport mono" aria-label="Playback speed">
+        <option value="2400">0.5x</option>
+        <option value="1200" selected>1x</option>
+        <option value="600">2x</option>
+        <option value="300">4x</option>
+      </select>
     </div>
   </footer>
 
   <script>
 /**
- * MemForge Trace Viewer (P9)
- * Static HTML/JavaScript Trace Replay & Visualization Interface
- * Strictly follows docs/ARCHITECTURE.md specification
+ * MemForge Trace Viewer
+ * Deterministic instrument-style visual system for contiguous memory allocation and paging simulation traces.
  */
 
 (function (global) {
@@ -1328,6 +1476,7 @@ kbd {
 
   /**
    * TraceParser: Validates and parses MemForge JSONL trace files.
+   * Strictly preserves original parser logic and error checking.
    */
   class TraceParser {
     static parseTrace(jsonlContent) {
@@ -1400,7 +1549,7 @@ kbd {
         } else if (type === 'RunSummary') {
           summary = record;
         } else {
-          // Assume event record
+          // Event record
           if (typeof record.seq !== 'number') {
             record.seq = events.length;
           }
@@ -1480,9 +1629,8 @@ kbd {
         if (snap) {
           lastKnownSnapshot = snap;
         } else if (lastKnownSnapshot) {
-          snap = lastKnownSnapshot; // Carry forward previous state if step snapshot was omitted
+          snap = lastKnownSnapshot;
         } else {
-          // Empty initial snapshot fallback
           snap = {
             type: 'Snapshot',
             step: stepNum,
@@ -1520,13 +1668,14 @@ kbd {
 
   /**
    * PlaybackEngine: Manages deterministic trace playback and navigation.
+   * Preserved unchanged to satisfy all automated unit tests.
    */
   class PlaybackEngine {
     constructor() {
       this.trace = null;
       this.currentStepIndex = 0;
       this.isPlaying = false;
-      this.playbackSpeedMs = 500;
+      this.playbackSpeedMs = 1200; // 1x = 1.2s per step
       this.timerId = null;
       this.listeners = new Set();
     }
@@ -1643,7 +1792,7 @@ kbd {
     jumpToNextFailureOrFault() {
       if (!this.trace || this.totalSteps === 0) return -1;
       const steps = this.trace.steps;
-      
+
       // Look forward from next step
       for (let i = this.currentStepIndex + 1; i < steps.length; i++) {
         if (this.stepHasFailureOrFault(steps[i])) {
@@ -1665,7 +1814,7 @@ kbd {
 
     stepHasFailureOrFault(step) {
       if (!step || !step.events) return false;
-      return step.events.some(ev => 
+      return step.events.some(ev =>
         ev.type === 'AllocationFailed' ||
         ev.type === 'PageFault' ||
         ev.type === 'AllocRejected' ||
@@ -1676,11 +1825,18 @@ kbd {
   }
 
   /**
-   * ContiguousRenderer: Renders the contiguous memory bar, blocks, and ruler.
+   * ContiguousRenderer: Renders memory strip, address ruler, block popovers,
+   * and signature animations (allocation ghost stepping, split, shake, free coalescing, FLIP compaction).
    */
   class ContiguousRenderer {
+    static pidColorMap = new Map();
+
+    /**
+     * Preserves exact return values required by test_metrics_calculation.js
+     * and maps process colours in first-seen order of pid.
+     */
     static getPidColor(pid) {
-      if (!pid) return '#334155';
+      if (!pid) return 'var(--pid-sys)';
       const pidStr = String(pid).toUpperCase();
       if (pidStr === 'SYS') return 'var(--pid-sys)';
       if (pidStr === 'P0' || pidStr === '0') return 'var(--pid-p0)';
@@ -1688,8 +1844,13 @@ kbd {
       if (pidStr === 'P2' || pidStr === '2') return 'var(--pid-p2)';
       if (pidStr === 'P3' || pidStr === '3') return 'var(--pid-p3)';
       if (pidStr === 'P4' || pidStr === '4') return 'var(--pid-p4)';
+      if (pidStr === 'P5' || pidStr === '5') return 'var(--pid-p5)';
 
-      // Deterministic HSL color for any dynamic PID
+      if (ContiguousRenderer.pidColorMap && ContiguousRenderer.pidColorMap.has(pidStr)) {
+        return ContiguousRenderer.pidColorMap.get(pidStr);
+      }
+
+      // Deterministic HSL fallback for dynamic process IDs
       let hash = 0;
       for (let i = 0; i < pidStr.length; i++) {
         hash = (hash << 5) - hash + pidStr.charCodeAt(i);
@@ -1699,501 +1860,1485 @@ kbd {
       return `hsl(${hue}, 75%, 45%)`;
     }
 
-    static renderMemoryMap(container, step, onSelectBlock) {
+    /**
+     * Assigns process colours in first-seen order of PID (excluding SYS).
+     */
+    static assignProcessColors(trace) {
+      ContiguousRenderer.pidColorMap = new Map();
+      if (!trace || !trace.steps) return;
+
+      const seenPids = [];
+      for (const step of trace.steps) {
+        if (step.snapshot?.contiguous?.blocks) {
+          for (const b of step.snapshot.contiguous.blocks) {
+            if (b.pid && b.pid !== 'SYS' && !seenPids.includes(b.pid)) {
+              seenPids.push(b.pid);
+            }
+          }
+        }
+        if (step.snapshot?.paging?.frames) {
+          for (const f of step.snapshot.paging.frames) {
+            if (f.pid && f.pid !== 'SYS' && !seenPids.includes(f.pid)) {
+              seenPids.push(f.pid);
+            }
+          }
+        }
+        if (step.events) {
+          for (const ev of step.events) {
+            if (ev.data?.pid && ev.data.pid !== 'SYS' && !seenPids.includes(ev.data.pid)) {
+              seenPids.push(ev.data.pid);
+            }
+          }
+        }
+      }
+
+      seenPids.forEach((p, idx) => {
+        const varName = `--pid-${p.toLowerCase()}`;
+        const colorVar = `var(--pid-c${idx % 6})`;
+        ContiguousRenderer.pidColorMap.set(p.toUpperCase(), colorVar);
+        if (typeof document !== 'undefined') {
+          document.documentElement.style.setProperty(varName, colorVar);
+        }
+      });
+    }
+
+    /**
+     * Renders contiguous strip and triggers signature animations when appropriate.
+     */
+    static renderContiguous(container, step, prevStep, animate = false, onHoverBlock = null) {
+      if (!container) return;
       container.innerHTML = '';
+
       if (!step || !step.snapshot || !step.snapshot.contiguous) {
-        container.innerHTML = '<div style="color:var(--text-muted);padding:1rem;">No contiguous memory snapshot available for this step.</div>';
         return;
       }
 
       const cont = step.snapshot.contiguous;
       const memSize = cont.memory_size || 1000;
       const blocks = cont.blocks || [];
+      const stripWidth = container.clientWidth || 800;
 
-      // Check current step events for relocated or allocated blocks
-      const stepEvents = step.events || [];
-      const relocatedIds = new Set();
-      const allocatedIds = new Set();
-      for (const ev of stepEvents) {
-        if (ev.type === 'BlockRelocated' && ev.data && ev.data.id) {
-          relocatedIds.add(String(ev.data.id));
-        }
-        if (ev.type === 'BlockAllocated' && ev.data && ev.data.id) {
-          allocatedIds.add(String(ev.data.id));
-        }
+      // Clean up previous animations or ghosts
+      const ghostHost = document.getElementById('ghost-host');
+      if (ghostHost) ghostHost.innerHTML = '';
+      const failureBracket = document.getElementById('failure-bracket');
+      if (failureBracket) {
+        failureBracket.hidden = true;
+        failureBracket.innerHTML = '';
       }
 
-      // Memory Bar
-      const bar = document.createElement('div');
-      bar.className = 'memory-bar';
-      bar.setAttribute('role', 'region');
-      bar.setAttribute('aria-label', `Memory Map 0 to ${memSize}`);
+      // Check events for animation triggers
+      const stepEvents = step.events || [];
+      const allocEv = stepEvents.find(e => e.type === 'BlockAllocated');
+      const failEv = stepEvents.find(e => e.type === 'AllocationFailed');
+      const pDecEv = stepEvents.find(e => e.type === 'PlacementDecided');
+      const compEv = stepEvents.find(e => e.type === 'CompactionCompleted');
+      const freedEv = stepEvents.find(e => e.type === 'BlockFreed');
+      const coalEv = stepEvents.find(e => e.type === 'BlocksCoalesced');
+      const relocatedEvs = stepEvents.filter(e => e.type === 'BlockRelocated');
 
-      blocks.forEach((block, idx) => {
-        const blockEl = document.createElement('div');
-        blockEl.className = 'mem-block';
+      // Create block elements
+      const blockElements = new Map();
+
+      blocks.forEach((block) => {
+        const el = document.createElement('div');
+        el.className = 'mem-block';
         const isFree = block.state === 'free';
 
-        // Calculate proportional width
-        const pct = Math.max(0, (block.size / memSize) * 100);
-        blockEl.style.width = `${pct}%`;
-        blockEl.style.flexShrink = '0';
+        const leftPct = (block.start / memSize) * 100;
+        const widthPct = (block.size / memSize) * 100;
+        const blockPxWidth = (block.size / memSize) * stripWidth;
+
+        el.style.left = `${leftPct}%`;
+        el.style.width = `${widthPct}%`;
 
         if (isFree) {
-          blockEl.classList.add('mem-block-free');
-          blockEl.innerHTML = `
-            <div class="block-label-id">FREE</div>
-            <div class="block-label-size">${block.size}</div>
-          `;
-          blockEl.title = `Free Hole [${block.start}, ${block.start + block.size}) · Size: ${block.size}`;
+          el.classList.add('mem-block-free');
+          el.setAttribute('tabindex', '0');
+          el.setAttribute('role', 'button');
+          el.setAttribute('aria-label', `Free hole, start ${block.start}, size ${block.size}`);
         } else {
-          blockEl.classList.add('mem-block-allocated');
-          const color = ContiguousRenderer.getPidColor(block.pid);
-          blockEl.style.backgroundColor = color;
-          const blockId = block.id ? `${block.pid}:${block.id}` : (block.pid || 'USED');
-          blockEl.innerHTML = `
-            <div class="block-label-id">${blockId}</div>
-            <div class="block-label-size">${block.size}</div>
-          `;
-          blockEl.title = `${blockId} [${block.start}, ${block.start + block.size}) · Size: ${block.size}${block.requested ? ` (req: ${block.requested})` : ''}`;
+          el.classList.add('mem-block-allocated');
+          el.setAttribute('tabindex', '0');
+          el.setAttribute('role', 'button');
+          const pid = block.pid || 'SYS';
+          const color = ContiguousRenderer.getPidColor(pid);
+          el.style.setProperty('--block-color', color);
 
-          if (relocatedIds.has(String(block.id)) || allocatedIds.has(String(block.id))) {
-            blockEl.classList.add('highlight-step');
+          const labelText = block.id || pid;
+          el.setAttribute('aria-label', `Process ${pid}, block ${labelText}, start ${block.start}, size ${block.size}`);
+
+          // Render label only when block width is wider than 56px
+          if (blockPxWidth > 56) {
+            const labelEl = document.createElement('span');
+            labelEl.className = 'block-label';
+            labelEl.textContent = labelText;
+            el.appendChild(labelEl);
           }
         }
 
-        blockEl.addEventListener('click', () => {
-          // Deselect other blocks
-          const prev = bar.querySelector('.mem-block.selected');
-          if (prev) prev.classList.remove('selected');
-          blockEl.classList.add('selected');
-          if (onSelectBlock) {
-            onSelectBlock(block, memSize);
-          }
-        });
+        // Hover & focus popover bindings
+        if (onHoverBlock) {
+          el.addEventListener('mouseenter', (ev) => onHoverBlock(block, el, ev));
+          el.addEventListener('mouseleave', () => onHoverBlock(null));
+          el.addEventListener('focus', (ev) => onHoverBlock(block, el, ev));
+          el.addEventListener('blur', () => onHoverBlock(null));
+        }
 
-        bar.appendChild(blockEl);
+        container.appendChild(el);
+        if (block.id) {
+          blockElements.set(String(block.id), el);
+        }
       });
 
-      container.appendChild(bar);
+      // Execute signature animations if forward step and not scrubbing
+      if (animate && prevStep && prevStep.snapshot?.contiguous) {
+        const prevBlocks = prevStep.snapshot.contiguous.blocks || [];
+        const prevHoles = prevBlocks.filter(b => b.state === 'free');
+
+        // Signature Animation 1: Compaction FLIP
+        if (compEv && relocatedEvs.length > 0) {
+          // Address order sort (by src)
+          const sortedReloc = [...relocatedEvs].sort((a, b) => a.data.src - b.data.src);
+          sortedReloc.forEach((reloc, idx) => {
+            const el = blockElements.get(String(reloc.data.id));
+            if (el) {
+              const src = reloc.data.src;
+              const dst = reloc.data.dst;
+              const deltaX = ((src - dst) / memSize) * container.clientWidth;
+
+              // "-src->dst" tag riding the block
+              const tag = document.createElement('span');
+              tag.className = 'block-relocate-tag';
+              tag.textContent = `-${src}->${dst}`;
+              el.appendChild(tag);
+
+              el.animate(
+                [
+                  { transform: `translateX(${deltaX}px)` },
+                  { transform: 'translateX(0)' }
+                ],
+                {
+                  duration: 380,
+                  delay: idx * 40,
+                  easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                  fill: 'backwards'
+                }
+              ).onfinish = () => {
+                tag.remove();
+              };
+            }
+          });
+
+          // Single hole at end gets brief --accent outline
+          setTimeout(() => {
+            const lastHole = container.querySelector('.mem-block-free:last-child');
+            if (lastHole) {
+              lastHole.animate(
+                [
+                  { outline: '2px solid var(--accent)', outlineOffset: '-2px' },
+                  { outline: '2px solid transparent', outlineOffset: '-2px' }
+                ],
+                { duration: 600, easing: 'ease-out' }
+              );
+            }
+          }, 380 + sortedReloc.length * 40);
+        }
+
+        // Signature Animation 2: Allocation
+        else if (pDecEv && (allocEv || failEv) && ghostHost) {
+          const req = pDecEv.data.requested;
+          const pid = allocEv ? allocEv.data.pid : failEv.data.pid;
+          const color = ContiguousRenderer.getPidColor(pid);
+          const scanned = pDecEv.data.scanned || 1;
+          const policy = pDecEv.data.policy || 'first-fit';
+
+          const ghost = document.createElement('div');
+          ghost.className = 'ghost-bar';
+          ghost.style.width = `${(req / memSize) * 100}%`;
+          ghost.style.left = '0%';
+          ghost.style.border = `2px solid ${color}`;
+          ghost.style.backgroundColor = `color-mix(in srgb, ${color} 40%, transparent)`;
+          ghostHost.appendChild(ghost);
+
+          // Determine scanned holes
+          let holesToScan = [];
+          if (policy === 'first-fit') {
+            holesToScan = prevHoles.slice(0, scanned);
+          } else {
+            holesToScan = [...prevHoles];
+          }
+
+          let stepIdx = 0;
+          const stepInterval = setInterval(() => {
+            if (stepIdx < holesToScan.length) {
+              const h = holesToScan[stepIdx];
+              ghost.style.left = `${(h.start / memSize) * 100}%`;
+              stepIdx++;
+            } else {
+              clearInterval(stepInterval);
+
+              if (allocEv) {
+                // Success: drop into place
+                ghost.style.top = '0px';
+                ghost.style.height = '88px';
+                ghost.style.opacity = '0';
+                setTimeout(() => ghost.remove(), 160);
+
+                // Remainder hole fades in hatched
+                const allocatedEl = blockElements.get(String(allocEv.data.id));
+                if (allocatedEl && allocatedEl.nextElementSibling?.classList.contains('mem-block-free')) {
+                  const remEl = allocatedEl.nextElementSibling;
+                  remEl.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 380, easing: 'ease-in' });
+                }
+              } else if (failEv) {
+                // Failure: shakes once in --bad
+                ghost.classList.add('shake');
+                ghost.style.borderColor = 'var(--bad)';
+                ghost.style.backgroundColor = 'color-mix(in srgb, var(--bad) 40%, transparent)';
+
+                // Every free hole outlines in --bad
+                const freeHoles = container.querySelectorAll('.mem-block-free');
+                freeHoles.forEach(h => h.classList.add('hole-failed'));
+
+                // Bracket under strip spans all holes labelled "free X · largest Y"
+                if (failureBracket) {
+                  failureBracket.hidden = false;
+                  const totalFree = failEv.data.total_free;
+                  const largest = failEv.data.largest_hole;
+                  failureBracket.innerHTML = `
+                    <svg class="bracket-svg" viewBox="0 0 100 24" preserveAspectRatio="none">
+                      <path d="M 0 4 L 0 14 L 100 14 L 100 4" fill="none" stroke="var(--bad)" stroke-width="1.5" />
+                    </svg>
+                    <span class="mono" style="position:absolute;top:4px;font-size:12px;color:var(--bad);background:var(--panel);padding:0 6px;">free ${totalFree} · largest ${largest}</span>
+                  `;
+                }
+              }
+            }
+          }, 120);
+        }
+
+        // Signature Animation 3: Free
+        else if (freedEv) {
+          const freedId = String(freedEv.data.id);
+          const freedEl = blockElements.get(freedId);
+          if (freedEl) {
+            freedEl.animate(
+              [
+                { backgroundColor: 'var(--block-color)' },
+                { backgroundColor: 'transparent' }
+              ],
+              { duration: 380, easing: 'ease-out' }
+            );
+          }
+        }
+      }
+    }
+
+    /**
+     * Renders ticks on address ruler at 0 and every 10% with mono 12px labels.
+     */
+    static renderAddressRuler(container, memSize, hoverTick = null) {
+      if (!container) return;
+      container.innerHTML = '';
+      if (!memSize || memSize <= 0) return;
+
+      // Ticks at 0% to 100% in 10% steps
+      for (let i = 0; i <= 10; i++) {
+        const pct = i * 10;
+        const addr = Math.round((memSize * pct) / 100);
+
+        const tick = document.createElement('div');
+        tick.className = 'ruler-tick';
+        tick.style.left = `${pct}%`;
+
+        tick.innerHTML = `
+          <div class="ruler-tick-line"></div>
+          <span class="ruler-tick-label">${addr}</span>
+        `;
+        container.appendChild(tick);
+      }
+
+      // Add dynamic hover tick if a block is hovered
+      if (hoverTick !== null && hoverTick !== undefined) {
+        const hoverPct = (hoverTick / memSize) * 100;
+        const tick = document.createElement('div');
+        tick.className = 'ruler-tick ruler-tick-hover';
+        tick.style.left = `${hoverPct}%`;
+
+        tick.innerHTML = `
+          <div class="ruler-tick-line"></div>
+          <span class="ruler-tick-label">${hoverTick}</span>
+        `;
+        container.appendChild(tick);
+      }
     }
   }
 
   /**
-   * PagingRenderer: Renders the frame table, page tables, and policy state.
+   * PagingRenderer: Renders textbook replacement table with reference string header,
+   * frame resident cells, slide-in animation, fault/hit markers, eviction strikethrough.
    */
   class PagingRenderer {
-    static renderPaging(container, step) {
-      container.innerHTML = '';
-      if (!step || !step.snapshot || !step.snapshot.paging) {
-        container.innerHTML = '<div style="color:var(--text-muted);padding:1rem;">No paging snapshot available for this step.</div>';
-        return;
-      }
+    static renderPaging(tableWrapper, thead, tbody, tfoot, trace, currentStepIdx, animate = false) {
+      if (!tableWrapper || !thead || !tbody || !tfoot || !trace) return;
 
-      const pag = step.snapshot.paging;
-      const frames = pag.frames || [];
-      const pageTables = pag.page_tables || {};
-      const policyState = pag.policy_state || {};
+      const steps = trace.steps || [];
+      const numFrames = trace.header.config?.frames || 3;
 
-      // Check for accessed frame in current step
-      const stepEvents = step.events || [];
-      let accessedFrame = null;
-      let accessKind = null;
-      for (const ev of stepEvents) {
-        if (ev.type === 'PageHit' && ev.data && ev.data.frame !== undefined) {
-          accessedFrame = ev.data.frame;
-          accessKind = 'hit';
-        } else if (ev.type === 'PageLoaded' && ev.data && ev.data.frame !== undefined) {
-          accessedFrame = ev.data.frame;
-          accessKind = 'loaded';
-        } else if (ev.type === 'PageEvicted' && ev.data && ev.data.frame !== undefined) {
-          accessedFrame = ev.data.frame;
-          accessKind = 'evicted';
-        }
-      }
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+      tfoot.innerHTML = '';
 
-      const wrapper = document.createElement('div');
-      wrapper.className = 'paging-container';
+      // 1. Reference String Header Row
+      const headRow = document.createElement('tr');
+      const cornerTh = document.createElement('th');
+      cornerTh.className = 'paging-th-corner';
+      cornerTh.textContent = 'Frame \\ Ref';
+      headRow.appendChild(cornerTh);
 
-      // 1. Physical Frame Table Section
-      const frameSection = document.createElement('div');
-      frameSection.innerHTML = '<div class="panel-subtitle" style="margin-bottom:0.75rem;font-weight:700;">PHYSICAL FRAMES</div>';
-      
-      const frameGrid = document.createElement('div');
-      frameGrid.className = 'frame-grid';
-
-      frames.forEach((f) => {
-        const frameCard = document.createElement('div');
-        frameCard.className = 'frame-card';
-        const isOccupied = f.pid !== null && f.pid !== undefined && f.vpn !== null && f.vpn !== undefined;
-
-        if (f.frame === accessedFrame) {
-          frameCard.classList.add('active-access');
-          if (accessKind === 'evicted') frameCard.classList.add('evicted');
+      steps.forEach((s, idx) => {
+        const th = document.createElement('th');
+        th.className = 'paging-th-ref mono';
+        if (idx === currentStepIdx) {
+          th.classList.add('current-col');
         }
 
-        frameCard.innerHTML = `
-          <div class="frame-header">
-            <span class="frame-num">F${f.frame}</span>
-            <span class="frame-status-dot ${isOccupied ? 'occupied' : ''}"></span>
-          </div>
-          <div class="frame-body">
-            <div class="frame-page-id">${isOccupied ? `${f.pid}:p${f.vpn}` : '<span style="color:var(--text-muted);font-weight:400;">[Free]</span>'}</div>
-            <div class="frame-bits">
-              <span class="bit-badge ${f.referenced ? 'active' : ''}">R:${f.referenced ? '1' : '0'}</span>
-              <span class="bit-badge ${f.dirty ? 'dirty' : ''}">D:${f.dirty ? '1' : '0'}</span>
-            </div>
-          </div>
-        `;
-        frameGrid.appendChild(frameCard);
+        // Determine referenced page
+        let refPage = '—';
+        const hit = s.events.find(e => e.type === 'PageHit');
+        const fault = s.events.find(e => e.type === 'PageFault');
+        if (hit && hit.data.vpn !== undefined) refPage = hit.data.vpn;
+        else if (fault && fault.data.vpn !== undefined) refPage = fault.data.vpn;
+
+        th.textContent = refPage;
+        th.title = `Step ${idx}: Page ${refPage}`;
+        headRow.appendChild(th);
       });
+      thead.appendChild(headRow);
 
-      frameSection.appendChild(frameGrid);
-      wrapper.appendChild(frameSection);
+      // 2. Rows for frames 0 to numFrames - 1
+      for (let f = 0; f < numFrames; f++) {
+        const row = document.createElement('tr');
+        const labelTd = document.createElement('td');
+        labelTd.className = 'paging-td-label mono';
+        labelTd.textContent = `Frame ${f}`;
+        row.appendChild(labelTd);
 
-      // 2. Policy State & Page Tables Row
-      const lowerRow = document.createElement('div');
-      lowerRow.style.display = 'grid';
-      lowerRow.style.gridTemplateColumns = 'repeat(auto-fit, minmax(260px, 1fr))';
-      lowerRow.style.gap = '1.25rem';
-
-      // Policy State
-      const policyBox = document.createElement('div');
-      policyBox.className = 'policy-state-box';
-      const polName = (policyState.policy || 'Replacement Policy').toUpperCase();
-      let policyDetailsHtml = '';
-
-      if (policyState.queue && Array.isArray(policyState.queue)) {
-        policyDetailsHtml = `
-          <div style="font-size:0.75rem;color:var(--text-muted);">Queue (Load Order):</div>
-          <div class="queue-chips">
-            ${policyState.queue.length > 0
-              ? policyState.queue.map(q => `<span class="queue-chip">Frame ${q}</span>`).join('')
-              : '<span style="font-size:0.75rem;color:var(--text-muted);">Empty</span>'
+        steps.forEach((s, stepIdx) => {
+          const td = document.createElement('td');
+          td.className = 'paging-cell mono';
+          if (stepIdx === currentStepIdx) {
+            td.classList.add('current-col');
+            if (animate) {
+              td.classList.add('cell-slide-in');
             }
-          </div>
-        `;
-      } else if (policyState.order && Array.isArray(policyState.order)) {
-        policyDetailsHtml = `
-          <div style="font-size:0.75rem;color:var(--text-muted);">Order (LRU to MRU):</div>
-          <div class="queue-chips">
-            ${policyState.order.map(q => `<span class="queue-chip">${q}</span>`).join('')}
-          </div>
-        `;
-      } else {
-        policyDetailsHtml = `<div style="font-size:0.75rem;color:var(--text-muted);">${JSON.stringify(policyState)}</div>`;
-      }
+          }
 
-      policyBox.innerHTML = `
-        <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);letter-spacing:0.05em;">POLICY STATE (${polName})</div>
-        ${policyDetailsHtml}
-      `;
-      lowerRow.appendChild(policyBox);
+          if (stepIdx <= currentStepIdx) {
+            const frames = s.snapshot?.paging?.frames || [];
+            const frameInfo = frames.find(fr => fr.frame === f);
+            const residentVpn = frameInfo && frameInfo.vpn !== null && frameInfo.vpn !== undefined ? frameInfo.vpn : null;
 
-      // Process Page Tables
-      const ptWrapper = document.createElement('div');
-      ptWrapper.className = 'page-table-wrapper';
-      const pids = Object.keys(pageTables);
+            // Check if current step accessed this frame
+            const hit = s.events.find(e => e.type === 'PageHit' && e.data.frame === f);
+            const loaded = s.events.find(e => e.type === 'PageLoaded' && e.data.frame === f);
+            const evicted = s.events.find(e => e.type === 'PageEvicted' && e.data.frame === f);
 
-      if (pids.length === 0) {
-        ptWrapper.innerHTML = '<div style="color:var(--text-muted);font-size:0.75rem;">No active page tables.</div>';
-      } else {
-        let ptHtml = '<div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);margin-bottom:0.5rem;letter-spacing:0.05em;">PAGE TABLES</div>';
-        pids.forEach(pid => {
-          const entries = pageTables[pid] || [];
-          const residentEntries = entries.filter(e => e.present);
-          ptHtml += `
-            <div style="margin-bottom:0.5rem;font-size:0.75rem;"><strong>Process ${pid}</strong> (${residentEntries.length} resident)</div>
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>VPN</th>
-                  <th>Frame</th>
-                  <th>P</th>
-                  <th>R</th>
-                  <th>D</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${entries.map(e => `
-                  <tr>
-                    <td>vpn ${e.vpn}</td>
-                    <td>${e.frame !== null && e.frame !== undefined ? `F${e.frame}` : '—'}</td>
-                    <td>${e.present ? '✓' : '✗'}</td>
-                    <td>${e.referenced ? '1' : '0'}</td>
-                    <td>${e.dirty ? '1' : '0'}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          `;
+            if (hit) {
+              td.classList.add('cell-hit');
+            }
+            if (loaded) {
+              td.classList.add('cell-fault-loaded');
+            }
+
+            if (evicted && loaded && stepIdx === currentStepIdx) {
+              td.innerHTML = `<span class="evicted-strike">${evicted.data.vpn}</span><span>${residentVpn}</span>`;
+            } else if (residentVpn !== null) {
+              td.textContent = residentVpn;
+            } else {
+              td.textContent = '';
+            }
+          }
+
+          row.appendChild(td);
         });
-        ptWrapper.innerHTML = ptHtml;
+
+        tbody.appendChild(row);
       }
 
-      lowerRow.appendChild(ptWrapper);
-      wrapper.appendChild(lowerRow);
+      // 3. Footer row for Fault / Hit markers
+      const footRow = document.createElement('tr');
+      const footCorner = document.createElement('td');
+      footCorner.className = 'paging-td-label mono';
+      footCorner.textContent = 'Status';
+      footRow.appendChild(footCorner);
 
-      container.appendChild(wrapper);
+      steps.forEach((s, idx) => {
+        const td = document.createElement('td');
+        td.className = 'paging-marker-cell mono';
+
+        if (idx <= currentStepIdx) {
+          const hasFault = s.events.some(e => e.type === 'PageFault');
+          const hasHit = s.events.some(e => e.type === 'PageHit');
+
+          if (hasFault) {
+            td.textContent = 'F';
+            td.classList.add('paging-marker-fault');
+          } else if (hasHit) {
+            td.textContent = 'H';
+            td.classList.add('paging-marker-hit');
+          }
+        }
+        footRow.appendChild(td);
+      });
+      tfoot.appendChild(footRow);
+
+      // Horizontal auto-scroll to keep current column in view
+      const currentColEl = thead.querySelector('.paging-th-ref.current-col');
+      if (currentColEl) {
+        const scrollTarget = currentColEl.offsetLeft - (tableWrapper.clientWidth / 2) + (currentColEl.clientWidth / 2);
+        tableWrapper.scrollTo({ left: Math.max(0, scrollTarget), behavior: 'smooth' });
+      }
     }
   }
 
   /**
-   * MetricsRenderer: Displays live metric cards and timeline sparklines.
+   * MetricsRenderer: Renders two-column table with counting animation and 1.2s fading deltas,
+   * plus the inline SVG step chart with ticks and seek on click.
    */
   class MetricsRenderer {
-    static renderMetrics(container, step, traceSession) {
-      container.innerHTML = '';
-      if (!step || !step.snapshot) return;
+    static prevValues = new Map();
 
-      const sub = step.subsystem;
-      const cardsWrapper = document.createElement('div');
-      cardsWrapper.className = 'metric-card-group';
+    static renderMetrics(tbody, step, prevStep, trace) {
+      if (!tbody || !step || !trace) return;
+      const sub = trace.subsystem;
+
+      tbody.innerHTML = '';
+      const rows = [];
 
       if (sub === 'contiguous') {
-        const cont = step.snapshot.contiguous || {};
-        const frag = cont.frag || {};
-        const memSize = cont.memory_size || 0;
-        const totalFree = frag.total_free !== undefined ? frag.total_free : 0;
-        const largestHole = frag.largest_hole !== undefined ? frag.largest_hole : 0;
-        const holeCount = frag.hole_count !== undefined ? frag.hole_count : 0;
-        const used = frag.used !== undefined ? frag.used : (memSize - totalFree);
-        const extFrag = frag.ext_frag !== undefined ? frag.ext_frag : 0;
-        const utilPct = memSize > 0 ? ((used / memSize) * 100).toFixed(1) : '0.0';
+        const currFrag = step.snapshot?.contiguous?.frag || {};
+        const prevFrag = prevStep?.snapshot?.contiguous?.frag || {};
 
-        // Ext Frag Color
-        let extFragColor = 'var(--accent-green)';
-        if (extFrag > 0.5) extFragColor = 'var(--accent-red)';
-        else if (extFrag > 0.2) extFragColor = 'var(--accent-amber)';
+        const freeCurr = currFrag.total_free ?? 0;
+        const freePrev = prevFrag.total_free ?? freeCurr;
+        const freeDelta = freeCurr - freePrev;
 
-        cardsWrapper.innerHTML = `
-          <div class="metric-card">
-            <span class="metric-title">External Frag</span>
-            <span class="metric-number" style="color:${extFragColor};">${(extFrag * 100).toFixed(1)}%</span>
-            <span class="metric-sub">${extFrag.toFixed(4)}</span>
-            <div class="metric-gauge"><div class="gauge-fill" style="width:${Math.min(100, extFrag * 100)}%;background:${extFragColor};"></div></div>
-          </div>
-          <div class="metric-card">
-            <span class="metric-title">Utilization</span>
-            <span class="metric-number">${utilPct}%</span>
-            <span class="metric-sub">${used} / ${memSize} units</span>
-            <div class="metric-gauge"><div class="gauge-fill" style="width:${utilPct}%;background:var(--accent-cyan);"></div></div>
-          </div>
-          <div class="metric-card">
-            <span class="metric-title">Total Free</span>
-            <span class="metric-number">${totalFree.toLocaleString()}</span>
-            <span class="metric-sub">${holeCount} holes</span>
-          </div>
-          <div class="metric-card">
-            <span class="metric-title">Largest Hole</span>
-            <span class="metric-number">${largestHole.toLocaleString()}</span>
-            <span class="metric-sub">${largestHole >= 0 ? `${((largestHole / (totalFree || 1)) * 100).toFixed(0)}% of free` : 'None'}</span>
-          </div>
-        `;
+        const largestCurr = currFrag.largest_hole ?? 0;
+        const largestPrev = prevFrag.largest_hole ?? largestCurr;
+        const largestDelta = largestCurr - largestPrev;
+
+        const holesCurr = currFrag.hole_count ?? 0;
+        const holesPrev = prevFrag.hole_count ?? holesCurr;
+        const holesDelta = holesCurr - holesPrev;
+
+        const extFragCurr = (currFrag.ext_frag ?? 0) * 100;
+        const extFragPrev = (prevFrag.ext_frag ?? currFrag.ext_frag ?? 0) * 100;
+        const extFragDelta = extFragCurr - extFragPrev;
+
+        const usedCurr = currFrag.used ?? 0;
+        const usedPrev = prevFrag.used ?? usedCurr;
+        const usedDelta = usedCurr - usedPrev;
+
+        const liveCurr = currFrag.live_blocks ?? 0;
+        const livePrev = prevFrag.live_blocks ?? liveCurr;
+        const liveDelta = liveCurr - livePrev;
+
+        rows.push({
+          label: 'Free',
+          valCurr: freeCurr,
+          valPrev: freePrev,
+          valFormatted: `${freeCurr}`,
+          delta: freeDelta,
+          deltaFormatted: freeDelta > 0 ? `+${freeDelta}` : `${freeDelta}`,
+          isOk: freeDelta >= 0
+        });
+
+        rows.push({
+          label: 'Largest hole',
+          valCurr: largestCurr,
+          valPrev: largestPrev,
+          valFormatted: `${largestCurr}`,
+          delta: largestDelta,
+          deltaFormatted: largestDelta > 0 ? `+${largestDelta}` : `${largestDelta}`,
+          isOk: largestDelta >= 0
+        });
+
+        rows.push({
+          label: 'Holes',
+          valCurr: holesCurr,
+          valPrev: holesPrev,
+          valFormatted: `${holesCurr}`,
+          delta: holesDelta,
+          deltaFormatted: holesDelta > 0 ? `+${holesDelta}` : `${holesDelta}`,
+          isOk: holesDelta <= 0
+        });
+
+        rows.push({
+          label: 'External fragmentation',
+          valCurr: extFragCurr,
+          valPrev: extFragPrev,
+          valFormatted: `${extFragCurr.toFixed(1)}%`,
+          delta: extFragDelta,
+          deltaFormatted: `${extFragDelta >= 0 ? '+' : ''}${extFragDelta.toFixed(1)}%`,
+          isOk: extFragDelta <= 0
+        });
+
+        rows.push({
+          label: 'Used',
+          valCurr: usedCurr,
+          valPrev: usedPrev,
+          valFormatted: `${usedCurr}`,
+          delta: usedDelta,
+          deltaFormatted: usedDelta > 0 ? `+${usedDelta}` : `${usedDelta}`,
+          isOk: usedDelta <= 0
+        });
+
+        rows.push({
+          label: 'Live blocks',
+          valCurr: liveCurr,
+          valPrev: livePrev,
+          valFormatted: `${liveCurr}`,
+          delta: liveDelta,
+          deltaFormatted: liveDelta > 0 ? `+${liveDelta}` : `${liveDelta}`,
+          isOk: liveDelta <= 0
+        });
       } else {
-        // Paging Subsystem Metrics
-        // Count hits, faults up to current step
-        const allSteps = traceSession.steps || [];
-        let hits = 0;
-        let faults = 0;
-        let evictions = 0;
-        let writebacks = 0;
+        // Paging Mode: Faults, Hits, Hit ratio, Evictions, Write-backs
+        let faultsCurr = 0, hitsCurr = 0, evictionsCurr = 0, writebacksCurr = 0;
+        let faultsPrev = 0, hitsPrev = 0, evictionsPrev = 0, writebacksPrev = 0;
 
+        const steps = trace.steps || [];
         for (let i = 0; i <= step.stepIndex; i++) {
-          const evs = allSteps[i]?.events || [];
-          for (const ev of evs) {
-            if (ev.type === 'PageHit') hits++;
-            if (ev.type === 'PageFault') faults++;
-            if (ev.type === 'PageEvicted') evictions++;
-            if (ev.type === 'PageWrittenBack') writebacks++;
+          const evs = steps[i].events || [];
+          for (const e of evs) {
+            if (e.type === 'PageFault') faultsCurr++;
+            if (e.type === 'PageHit') hitsCurr++;
+            if (e.type === 'PageEvicted') {
+              evictionsCurr++;
+              if (e.data.dirty) writebacksCurr++;
+            }
+          }
+          if (prevStep && i <= prevStep.stepIndex) {
+            faultsPrev = faultsCurr;
+            hitsPrev = hitsCurr;
+            evictionsPrev = evictionsCurr;
+            writebacksPrev = writebacksCurr;
           }
         }
 
-        const totalRefs = hits + faults;
-        const faultRate = totalRefs > 0 ? ((faults / totalRefs) * 100).toFixed(1) : '0.0';
-        const hitRate = totalRefs > 0 ? ((hits / totalRefs) * 100).toFixed(1) : '0.0';
+        const totalRefsCurr = faultsCurr + hitsCurr;
+        const hitRatioCurr = totalRefsCurr > 0 ? (hitsCurr / totalRefsCurr) * 100 : 0;
+        const totalRefsPrev = faultsPrev + hitsPrev;
+        const hitRatioPrev = totalRefsPrev > 0 ? (hitsPrev / totalRefsPrev) * 100 : hitRatioCurr;
 
-        cardsWrapper.innerHTML = `
-          <div class="metric-card">
-            <span class="metric-title">Fault Rate</span>
-            <span class="metric-number" style="color:var(--accent-amber);">${faultRate}%</span>
-            <span class="metric-sub">${faults} of ${totalRefs} refs</span>
-            <div class="metric-gauge"><div class="gauge-fill" style="width:${faultRate}%;background:var(--accent-amber);"></div></div>
-          </div>
-          <div class="metric-card">
-            <span class="metric-title">Hit Rate</span>
-            <span class="metric-number" style="color:var(--accent-green);">${hitRate}%</span>
-            <span class="metric-sub">${hits} hits</span>
-            <div class="metric-gauge"><div class="gauge-fill" style="width:${hitRate}%;background:var(--accent-green);"></div></div>
-          </div>
-          <div class="metric-card">
-            <span class="metric-title">Evictions</span>
-            <span class="metric-number">${evictions}</span>
-            <span class="metric-sub">${writebacks} write-backs</span>
-          </div>
-          <div class="metric-card">
-            <span class="metric-title">References</span>
-            <span class="metric-number">${totalRefs}</span>
-            <span class="metric-sub">Step ${step.stepIndex + 1} of ${traceSession.totalSteps}</span>
-          </div>
-        `;
+        rows.push({
+          label: 'Faults',
+          valCurr: faultsCurr,
+          valPrev: faultsPrev,
+          valFormatted: `${faultsCurr}`,
+          delta: faultsCurr - faultsPrev,
+          deltaFormatted: `+${faultsCurr - faultsPrev}`,
+          isOk: false
+        });
+
+        rows.push({
+          label: 'Hits',
+          valCurr: hitsCurr,
+          valPrev: hitsPrev,
+          valFormatted: `${hitsCurr}`,
+          delta: hitsCurr - hitsPrev,
+          deltaFormatted: `+${hitsCurr - hitsPrev}`,
+          isOk: true
+        });
+
+        rows.push({
+          label: 'Hit ratio',
+          valCurr: hitRatioCurr,
+          valPrev: hitRatioPrev,
+          valFormatted: `${hitRatioCurr.toFixed(1)}%`,
+          delta: hitRatioCurr - hitRatioPrev,
+          deltaFormatted: `${(hitRatioCurr - hitRatioPrev) >= 0 ? '+' : ''}${(hitRatioCurr - hitRatioPrev).toFixed(1)}%`,
+          isOk: (hitRatioCurr - hitRatioPrev) >= 0
+        });
+
+        rows.push({
+          label: 'Evictions',
+          valCurr: evictionsCurr,
+          valPrev: evictionsPrev,
+          valFormatted: `${evictionsCurr}`,
+          delta: evictionsCurr - evictionsPrev,
+          deltaFormatted: `+${evictionsCurr - evictionsPrev}`,
+          isOk: false
+        });
+
+        rows.push({
+          label: 'Write-backs',
+          valCurr: writebacksCurr,
+          valPrev: writebacksPrev,
+          valFormatted: `${writebacksCurr}`,
+          delta: writebacksCurr - writebacksPrev,
+          deltaFormatted: `+${writebacksCurr - writebacksPrev}`,
+          isOk: false
+        });
       }
 
-      container.appendChild(cardsWrapper);
+      // Populate table rows
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        const tdLabel = document.createElement('td');
+        tdLabel.className = 'metric-label';
+        tdLabel.textContent = r.label;
 
-      // Render Step Trend Sparkline
-      const trendCard = document.createElement('div');
-      trendCard.className = 'trend-card';
-      trendCard.innerHTML = `
-        <div style="font-size:0.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">
-          ${sub === 'contiguous' ? 'External Fragmentation Timeline' : 'Cumulative Page Faults'}
-        </div>
-      `;
+        const tdVal = document.createElement('td');
+        tdVal.className = 'metric-value-cell';
 
-      const sparklineSvg = MetricsRenderer.createSparklineSvg(traceSession, step.stepIndex);
-      trendCard.appendChild(sparklineSvg);
-      container.appendChild(trendCard);
+        const valSpan = document.createElement('span');
+        valSpan.className = 'metric-val';
+        valSpan.textContent = r.valFormatted;
+
+        // Animate count over 380ms
+        if (r.valPrev !== r.valCurr && typeof r.valCurr === 'number') {
+          const startTime = performance.now();
+          const duration = 380;
+          const isFloat = r.label.includes('%') || r.label.includes('ratio');
+
+          const stepCount = (now) => {
+            const elapsed = now - startTime;
+            const progress = Math.min(1, elapsed / duration);
+            const currentVal = r.valPrev + (r.valCurr - r.valPrev) * progress;
+            valSpan.textContent = isFloat ? `${currentVal.toFixed(1)}%` : `${Math.round(currentVal)}`;
+            if (progress < 1) {
+              requestAnimationFrame(stepCount);
+            } else {
+              valSpan.textContent = r.valFormatted;
+            }
+          };
+          requestAnimationFrame(stepCount);
+        }
+
+        tdVal.appendChild(valSpan);
+
+        // Delta indicator (fades after 1.2s)
+        if (r.delta !== 0 && prevStep) {
+          const deltaSpan = document.createElement('span');
+          deltaSpan.className = `delta ${r.isOk ? 'delta-ok' : 'delta-bad'}`;
+          deltaSpan.textContent = r.deltaFormatted;
+          tdVal.appendChild(deltaSpan);
+
+          setTimeout(() => {
+            deltaSpan.classList.add('fade-out');
+          }, 1200);
+        }
+
+        tr.appendChild(tdLabel);
+        tr.appendChild(tdVal);
+        tbody.appendChild(tr);
+      });
     }
 
-    static createSparklineSvg(traceSession, currentStepIdx) {
-      const steps = traceSession.steps || [];
+    /**
+     * Renders inline SVG step chart with stepped line, baseline ticks, and click-to-seek.
+     */
+    static renderStepChart(svg, trace, currentStepIdx, onSeek) {
+      if (!svg || !trace || !trace.steps) return;
+      svg.innerHTML = '';
+
+      const steps = trace.steps;
       const n = steps.length;
-      const width = 340;
-      const height = 50;
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-      svg.className = 'sparkline-svg';
+      const W = 360;
+      const H = 120;
+      const padX = 12;
+      const padTop = 12;
+      const baselineY = H - 16;
+      const chartH = baselineY - padTop;
 
-      if (n <= 1) {
-        svg.innerHTML = `<text x="50%" y="50%" fill="#64748b" font-size="10" text-anchor="middle" dominant-baseline="middle">Single step trace</text>`;
-        return svg;
-      }
+      if (n === 0) return;
 
-      // Gather points
-      const points = [];
-      let maxVal = 0.001;
+      // Extract values per step
+      const values = [];
+      let maxVal = 1;
 
-      if (traceSession.subsystem === 'contiguous') {
-        for (let i = 0; i < n; i++) {
-          const val = steps[i].snapshot?.contiguous?.frag?.ext_frag || 0;
-          points.push(val);
+      if (trace.subsystem === 'contiguous') {
+        steps.forEach(s => {
+          const val = (s.snapshot?.contiguous?.frag?.ext_frag ?? 0) * 100;
+          values.push(val);
           if (val > maxVal) maxVal = val;
-        }
+        });
+        maxVal = Math.max(100, maxVal);
       } else {
-        let cumulativeFaults = 0;
-        for (let i = 0; i < n; i++) {
-          const evs = steps[i].events || [];
-          for (const ev of evs) {
-            if (ev.type === 'PageFault') cumulativeFaults++;
-          }
-          points.push(cumulativeFaults);
-          if (cumulativeFaults > maxVal) maxVal = cumulativeFaults;
-        }
+        let cumFaults = 0;
+        steps.forEach(s => {
+          const fault = s.events.some(e => e.type === 'PageFault');
+          if (fault) cumFaults++;
+          values.push(cumFaults);
+        });
+        maxVal = Math.max(cumFaults, 1);
       }
 
-      const pathData = points.map((val, idx) => {
-        const x = (idx / (n - 1)) * width;
-        const y = height - (val / maxVal) * (height - 10) - 5;
-        return `${idx === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-      }).join(' ');
+      const getX = (idx) => n > 1 ? padX + (idx / (n - 1)) * (W - 2 * padX) : W / 2;
+      const getY = (val) => baselineY - (val / maxVal) * chartH;
 
-      const currentX = (currentStepIdx / (n - 1)) * width;
-      const currentY = height - (points[currentStepIdx] / maxVal) * (height - 10) - 5;
+      // Build stepped line and area paths
+      let steppedPathD = '';
+      let areaPathD = '';
 
-      svg.innerHTML = `
-        <path d="${pathData}" fill="none" stroke="#00d2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-        <line x1="${currentX.toFixed(1)}" y1="0" x2="${currentX.toFixed(1)}" y2="${height}" stroke="rgba(255,255,255,0.4)" stroke-dasharray="2,2" />
-        <circle cx="${currentX.toFixed(1)}" cy="${currentY.toFixed(1)}" r="4" fill="#00d2ff" stroke="#ffffff" stroke-width="1.5" />
-      `;
+      if (n === 1) {
+        const x = getX(0);
+        const y = getY(values[0]);
+        steppedPathD = `M ${x - 20} ${y} L ${x + 20} ${y}`;
+      } else {
+        steppedPathD = `M ${getX(0)} ${getY(values[0])}`;
+        areaPathD = `M ${getX(0)} ${baselineY} L ${getX(0)} ${getY(values[0])}`;
 
-      return svg;
+        for (let i = 0; i < n - 1; i++) {
+          const x1 = getX(i);
+          const x2 = getX(i + 1);
+          const y1 = getY(values[i]);
+          const y2 = getY(values[i + 1]);
+
+          steppedPathD += ` L ${x2} ${y1} L ${x2} ${y2}`;
+          areaPathD += ` L ${x2} ${y1} L ${x2} ${y2}`;
+        }
+
+        areaPathD += ` L ${getX(n - 1)} ${baselineY} Z`;
+      }
+
+      // 1. Area fill (--rule)
+      if (areaPathD) {
+        const areaEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        areaEl.setAttribute('d', areaPathD);
+        areaEl.setAttribute('fill', 'var(--rule)');
+        svg.appendChild(areaEl);
+      }
+
+      // 2. Stepped line (--muted)
+      const lineEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      lineEl.setAttribute('d', steppedPathD);
+      lineEl.setAttribute('fill', 'none');
+      lineEl.setAttribute('stroke', 'var(--muted)');
+      lineEl.setAttribute('stroke-width', '1.5');
+      svg.appendChild(lineEl);
+
+      // 3. Baseline ticks for failures (--bad) and compactions (--accent)
+      steps.forEach((s, idx) => {
+        const x = getX(idx);
+        const isFail = s.events.some(e => e.type === 'AllocationFailed' || e.type === 'PageFault');
+        const isComp = s.events.some(e => e.type === 'CompactionCompleted' || e.type === 'CompactionStarted');
+
+        if (isFail) {
+          const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          tick.setAttribute('x1', x);
+          tick.setAttribute('y1', baselineY - 6);
+          tick.setAttribute('x2', x);
+          tick.setAttribute('y2', baselineY + 2);
+          tick.setAttribute('stroke', 'var(--bad)');
+          tick.setAttribute('stroke-width', '2');
+          svg.appendChild(tick);
+        } else if (isComp) {
+          const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          tick.setAttribute('x1', x);
+          tick.setAttribute('y1', baselineY - 6);
+          tick.setAttribute('x2', x);
+          tick.setAttribute('y2', baselineY + 2);
+          tick.setAttribute('stroke', 'var(--accent)');
+          tick.setAttribute('stroke-width', '2');
+          svg.appendChild(tick);
+        }
+      });
+
+      // 4. Vertical playhead line in --accent
+      const currX = getX(currentStepIdx);
+      const playhead = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      playhead.setAttribute('x1', currX);
+      playhead.setAttribute('y1', padTop);
+      playhead.setAttribute('x2', currX);
+      playhead.setAttribute('y2', baselineY + 4);
+      playhead.setAttribute('stroke', 'var(--accent)');
+      playhead.setAttribute('stroke-width', '2');
+      svg.appendChild(playhead);
+
+      // Click to seek
+      svg.onclick = (ev) => {
+        const rect = svg.getBoundingClientRect();
+        const clickX = ev.clientX - rect.left;
+        const normX = Math.max(0, Math.min(1, (clickX - padX) / (rect.width - 2 * padX)));
+        const targetStep = Math.round(normX * (n - 1));
+        if (onSeek) onSeek(targetStep);
+      };
     }
   }
 
   /**
-   * EventRenderer: Formats and displays event details and policy reasons.
+   * EventRenderer: Formats compact, readable event records for the current step.
    */
   class EventRenderer {
     static renderEvents(container, step) {
+      if (!container) return;
       container.innerHTML = '';
       if (!step) return;
 
       const events = step.events || [];
-      const stepNum = step.stepNumber;
-
-      // Determine step summary message & status
-      let summaryTitle = `Step ${stepNum}`;
-      let summaryDesc = 'No state changing events in this step.';
-      let bannerClass = 'step-summary-banner';
-
-      for (const ev of events) {
-        if (ev.type === 'AllocationFailed') {
-          summaryTitle = `Allocation Failed (${ev.data?.cause || 'REJECTED'})`;
-          summaryDesc = `Process ${ev.data?.pid || ''} requested ${ev.data?.requested} units. Largest hole was ${ev.data?.largest_hole}, failing due to ${ev.data?.cause}.`;
-          bannerClass += ' failure';
-          break;
-        } else if (ev.type === 'BlockAllocated') {
-          summaryTitle = `Block Allocated (${ev.data?.pid}:${ev.data?.id})`;
-          summaryDesc = `Placed ${ev.data?.size} units at address [${ev.data?.start}, ${ev.data?.start + ev.data?.size}).`;
-          break;
-        } else if (ev.type === 'CompactionCompleted') {
-          summaryTitle = `Compaction Completed`;
-          summaryDesc = `Relocated ${ev.data?.blocks_moved} blocks, moving ${ev.data?.units_moved} units into 1 contiguous hole.`;
-          break;
-        } else if (ev.type === 'PageFault') {
-          summaryTitle = `Page Fault (${ev.data?.kind || 'FAULT'})`;
-          summaryDesc = `Access to VPN ${ev.data?.vpn} by process ${ev.data?.pid} resulted in a ${ev.data?.kind} fault.`;
-          bannerClass += ' failure';
-          break;
-        } else if (ev.type === 'PageHit') {
-          summaryTitle = `Page Hit (Frame ${ev.data?.frame})`;
-          summaryDesc = `Access to VPN ${ev.data?.vpn} hit in Frame ${ev.data?.frame}.`;
-          bannerClass += ' hit';
-          break;
-        }
-      }
-
-      const summaryBanner = document.createElement('div');
-      summaryBanner.className = bannerClass;
-      summaryBanner.innerHTML = `
-        <div class="step-summary-title">${summaryTitle}</div>
-        <div class="step-summary-desc">${summaryDesc}</div>
-      `;
-      container.appendChild(summaryBanner);
-
-      // Event List
-      const listEl = document.createElement('div');
-      listEl.className = 'events-list';
-
       if (events.length === 0) {
-        listEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem 0;">No individual event records for this step.</div>';
-      } else {
-        events.forEach(ev => {
-          const item = document.createElement('div');
-          item.className = 'event-item';
-          const chipClass = `chip-${ev.type}`;
-
-          const dataPairs = Object.entries(ev.data || {})
-            .map(([k, v]) => `${k}: ${typeof v === 'object' && v !== null ? JSON.stringify(v) : v}`)
-            .join(' · ');
-
-          item.innerHTML = `
-            <div class="event-item-header">
-              <span class="event-chip ${chipClass}">${ev.type}</span>
-              <span class="event-seq">seq ${ev.seq}</span>
-            </div>
-            <div class="event-params">${dataPairs || '—'}</div>
-          `;
-          listEl.appendChild(item);
-        });
+        container.innerHTML = '<div style="color:var(--faint);font-size:12px;padding:8px 0;">No state changing events in this step.</div>';
+        return;
       }
 
-      container.appendChild(listEl);
+      events.forEach(ev => {
+        const row = document.createElement('div');
+        row.className = 'event-row';
+
+        const seqSpan = document.createElement('span');
+        seqSpan.className = 'event-seq mono';
+        seqSpan.textContent = ev.seq !== undefined ? ev.seq : '—';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'event-name';
+        nameSpan.textContent = ev.type;
+
+        const fieldsSpan = document.createElement('span');
+        fieldsSpan.className = 'event-fields mono';
+        const entries = Object.entries(ev.data || {});
+        fieldsSpan.textContent = entries.map(([k, v]) => `${k}=${typeof v === 'object' && v !== null ? JSON.stringify(v) : v}`).join(' ');
+
+        row.appendChild(seqSpan);
+        row.appendChild(nameSpan);
+        row.appendChild(fieldsSpan);
+        container.appendChild(row);
+      });
     }
   }
 
   /**
-   * Sample Traces: Preloaded fixtures for AC-1, AC-2, AC-3, AC-4
+   * UIController: Coordinates DOM views, interactions, keyboard navigation,
+   * narration generation, and theme management.
+   */
+  class UIController {
+    constructor() {
+      this.engine = new PlaybackEngine();
+      this.lastRenderedStep = -1;
+      this.isScrubbing = false;
+
+      this.bindDOMElements();
+      this.initTheme();
+      this.bindEvents();
+
+      // Listen for playback state updates
+      this.engine.addListener((type) => {
+        if (type === 'load') {
+          ContiguousRenderer.assignProcessColors(this.engine.trace);
+          this.lastRenderedStep = -1;
+          this.updateTraceHeader();
+          this.updateScrubberBounds();
+          this.updateEmptyState();
+        }
+        this.updateView();
+      });
+
+      // Default empty state
+      this.updateEmptyState();
+    }
+
+    bindDOMElements() {
+      // Top bar
+      this.traceName = document.getElementById('trace-name');
+      this.metaPolicy = document.getElementById('meta-policy');
+      this.metaConfig = document.getElementById('meta-config');
+      this.fileInput = document.getElementById('file-input');
+      this.btnOpenFile = document.getElementById('btn-open-file');
+      this.sampleSelect = document.getElementById('sample-select');
+      this.btnThemeToggle = document.getElementById('btn-theme-toggle');
+      this.themeIconSlot = document.getElementById('theme-icon-slot');
+      this.btnKeyboardHelp = document.getElementById('btn-keyboard-help');
+      this.keyboardPopover = document.getElementById('keyboard-popover');
+
+      // Empty state
+      this.emptyState = document.getElementById('empty-state');
+      this.btnEmptyOpen = document.getElementById('btn-empty-open');
+      this.loadErrorMessage = document.getElementById('load-error-message');
+      this.dashboardGrid = document.getElementById('dashboard-grid');
+
+      // Left panel
+      this.headingMemoryPanel = document.getElementById('heading-memory-panel');
+      this.contiguousViewport = document.getElementById('contiguous-viewport');
+      this.memoryStrip = document.getElementById('memory-strip');
+      this.addressRuler = document.getElementById('address-ruler');
+      this.failureBracket = document.getElementById('failure-bracket');
+      this.pagingViewport = document.getElementById('paging-viewport');
+      this.pagingTableWrapper = document.getElementById('paging-table-wrapper');
+      this.pagingThead = document.getElementById('paging-thead');
+      this.pagingTbody = document.getElementById('paging-tbody');
+      this.pagingTfoot = document.getElementById('paging-tfoot');
+      this.narrationText = document.getElementById('narration-text');
+      this.blockPopover = document.getElementById('block-popover');
+
+      // Right panels
+      this.headingMetricsPanel = document.getElementById('heading-metrics-panel');
+      this.metricsTbody = document.getElementById('metrics-tbody');
+      this.stepChartSvg = document.getElementById('step-chart-svg');
+      this.eventsList = document.getElementById('events-list');
+
+      // Transport bar
+      this.btnSkipStart = document.getElementById('btn-skip-start');
+      this.btnStepBack = document.getElementById('btn-step-back');
+      this.btnPlayPause = document.getElementById('btn-play-pause');
+      this.playIconSlot = document.getElementById('play-icon-slot');
+      this.btnStepForward = document.getElementById('btn-step-forward');
+      this.btnSkipEnd = document.getElementById('btn-skip-end');
+      this.stepCounter = document.getElementById('step-counter');
+      this.scrubberTicks = document.getElementById('scrubber-ticks');
+      this.scrubberRange = document.getElementById('scrubber-range');
+      this.speedSelect = document.getElementById('speed-select');
+    }
+
+    initTheme() {
+      let savedTheme = 'dark';
+      try {
+        savedTheme = localStorage.getItem('memforge-theme') || 'dark';
+      } catch (e) {}
+
+      if (savedTheme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      this.updateThemeButtonIcon();
+    }
+
+    toggleTheme() {
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      const nextTheme = isLight ? 'dark' : 'light';
+      if (nextTheme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      try {
+        localStorage.setItem('memforge-theme', nextTheme);
+      } catch (e) {}
+      this.updateThemeButtonIcon();
+    }
+
+    updateThemeButtonIcon() {
+      if (!this.themeIconSlot) return;
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      if (isLight) {
+        // Moon icon for switching to dark
+        this.themeIconSlot.innerHTML = `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5 A5.5 5.5 0 1 1 6.5 2.5 A4.5 4.5 0 0 0 13.5 9.5 Z" /></svg>`;
+      } else {
+        // Sun icon for switching to light
+        this.themeIconSlot.innerHTML = `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3" /><line x1="8" y1="1.5" x2="8" y2="3" /><line x1="8" y1="13" x2="8" y2="14.5" /><line x1="1.5" y1="8" x2="3" y2="8" /><line x1="13" y1="8" x2="14.5" y2="8" /><line x1="3.4" y1="3.4" x2="4.5" y2="4.5" /><line x1="11.5" y1="11.5" x2="12.6" y2="12.6" /><line x1="3.4" y1="12.6" x2="4.5" y2="11.5" /><line x1="11.5" y1="4.5" x2="12.6" y2="3.4" /></svg>`;
+      }
+    }
+
+    bindEvents() {
+      // File open dialogs
+      if (this.btnOpenFile) this.btnOpenFile.onclick = () => this.fileInput?.click();
+      if (this.btnEmptyOpen) this.btnEmptyOpen.onclick = () => this.fileInput?.click();
+
+      if (this.fileInput) {
+        this.fileInput.onchange = (e) => {
+          const file = e.target.files?.[0];
+          if (file) this.loadFile(file);
+        };
+      }
+
+      // Drag and drop trace file on window
+      window.addEventListener('dragover', (e) => e.preventDefault());
+      window.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const file = e.dataTransfer?.files?.[0];
+        if (file) this.loadFile(file);
+      });
+
+      // Sample trace selections
+      if (this.sampleSelect) {
+        this.sampleSelect.onchange = () => {
+          const key = this.sampleSelect.value;
+          if (key && SAMPLE_TRACES[key]) {
+            this.loadTraceString(SAMPLE_TRACES[key], `sample_${key}.jsonl`);
+          }
+        };
+      }
+
+      document.querySelectorAll('.btn-sample-card').forEach(btn => {
+        btn.onclick = () => {
+          const key = btn.getAttribute('data-sample');
+          if (key && SAMPLE_TRACES[key]) {
+            this.loadTraceString(SAMPLE_TRACES[key], `sample_${key}.jsonl`);
+          }
+        };
+      });
+
+      // Theme toggle button
+      if (this.btnThemeToggle) {
+        this.btnThemeToggle.onclick = () => this.toggleTheme();
+      }
+
+      // Keyboard shortcuts help popover
+      if (this.btnKeyboardHelp) {
+        this.btnKeyboardHelp.onclick = (e) => {
+          e.stopPropagation();
+          const isHidden = this.keyboardPopover.hasAttribute('hidden');
+          if (isHidden) {
+            this.keyboardPopover.removeAttribute('hidden');
+            this.btnKeyboardHelp.setAttribute('aria-expanded', 'true');
+          } else {
+            this.keyboardPopover.setAttribute('hidden', '');
+            this.btnKeyboardHelp.setAttribute('aria-expanded', 'false');
+          }
+        };
+      }
+
+      document.addEventListener('click', (e) => {
+        if (this.keyboardPopover && !this.keyboardPopover.contains(e.target) && e.target !== this.btnKeyboardHelp) {
+          this.keyboardPopover.setAttribute('hidden', '');
+          this.btnKeyboardHelp?.setAttribute('aria-expanded', 'false');
+        }
+      });
+
+      // Transport controls
+      if (this.btnSkipStart) this.btnSkipStart.onclick = () => this.engine.reset();
+      if (this.btnStepBack) this.btnStepBack.onclick = () => this.engine.prevStep();
+      if (this.btnPlayPause) this.btnPlayPause.onclick = () => this.engine.togglePlay();
+      if (this.btnStepForward) this.btnStepForward.onclick = () => this.engine.nextStep();
+      if (this.btnSkipEnd) this.btnSkipEnd.onclick = () => this.engine.goToStep(this.engine.totalSteps - 1);
+
+      // Scrubber range
+      if (this.scrubberRange) {
+        this.scrubberRange.oninput = (e) => {
+          this.isScrubbing = true;
+          this.engine.goToStep(Number(e.target.value));
+        };
+        this.scrubberRange.onchange = () => {
+          this.isScrubbing = false;
+        };
+      }
+
+      // Playback speed
+      if (this.speedSelect) {
+        this.speedSelect.onchange = () => {
+          this.engine.setSpeed(Number(this.speedSelect.value));
+        };
+      }
+
+      // Global keyboard shortcuts
+      window.addEventListener('keydown', (e) => {
+        // Ignore if user is inside an input or select
+        if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName) && document.activeElement !== this.scrubberRange) {
+          return;
+        }
+
+        switch (e.key) {
+          case ' ':
+            e.preventDefault();
+            this.engine.togglePlay();
+            break;
+          case 'ArrowLeft':
+            e.preventDefault();
+            this.engine.prevStep();
+            break;
+          case 'ArrowRight':
+            e.preventDefault();
+            this.engine.nextStep();
+            break;
+          case 'Home':
+            e.preventDefault();
+            this.engine.reset();
+            break;
+          case 'End':
+            e.preventDefault();
+            this.engine.goToStep(this.engine.totalSteps - 1);
+            break;
+          case 't':
+          case 'T':
+            this.toggleTheme();
+            break;
+          case '?':
+            this.btnKeyboardHelp?.click();
+            break;
+          case 'Escape':
+            this.keyboardPopover?.setAttribute('hidden', '');
+            this.btnKeyboardHelp?.setAttribute('aria-expanded', 'false');
+            if (this.blockPopover) this.blockPopover.setAttribute('hidden', '');
+            break;
+        }
+      });
+    }
+
+    loadFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        this.loadTraceString(e.target.result, file.name);
+      };
+      reader.onerror = () => {
+        this.showLoadError('Could not read trace file from disk.');
+      };
+      reader.readAsText(file);
+    }
+
+    loadTraceString(traceText, filename = 'trace.jsonl') {
+      const parseResult = TraceParser.parseTrace(traceText);
+      if (!parseResult.ok) {
+        this.showLoadError(parseResult.error);
+        return;
+      }
+
+      this.clearLoadError();
+      this.currentFilename = filename;
+      this.engine.loadTrace(parseResult.trace);
+    }
+
+    showLoadError(msg) {
+      if (this.loadErrorMessage) {
+        this.loadErrorMessage.textContent = msg;
+        this.loadErrorMessage.removeAttribute('hidden');
+      }
+    }
+
+    clearLoadError() {
+      if (this.loadErrorMessage) {
+        this.loadErrorMessage.textContent = '';
+        this.loadErrorMessage.setAttribute('hidden', '');
+      }
+    }
+
+    updateEmptyState() {
+      const hasTrace = this.engine.trace !== null;
+      if (this.emptyState) this.emptyState.hidden = hasTrace;
+      if (this.dashboardGrid) this.dashboardGrid.hidden = !hasTrace;
+
+      // Enable / disable transport controls
+      [this.btnSkipStart, this.btnStepBack, this.btnPlayPause, this.btnStepForward, this.btnSkipEnd, this.scrubberRange].forEach(el => {
+        if (el) el.disabled = !hasTrace;
+      });
+    }
+
+    updateTraceHeader() {
+      const trace = this.engine.trace;
+      if (!trace) return;
+
+      const h = trace.header;
+      if (this.traceName) this.traceName.textContent = this.currentFilename || h.workload || 'trace.jsonl';
+      if (this.metaPolicy) this.metaPolicy.textContent = `policy ${h.policy || 'first-fit'}`;
+
+      if (this.metaConfig) {
+        if (trace.subsystem === 'contiguous') {
+          const memSize = h.config?.memory_size || 1000;
+          this.metaConfig.textContent = `contiguous · ${memSize} units`;
+        } else {
+          const frames = h.config?.frames || 3;
+          const pageSize = h.config?.page_size || 4096;
+          this.metaConfig.textContent = `paging · ${frames} frames · ${pageSize} B pages`;
+        }
+      }
+    }
+
+    updateScrubberBounds() {
+      const trace = this.engine.trace;
+      const total = trace ? trace.totalSteps : 0;
+
+      if (this.scrubberRange) {
+        this.scrubberRange.min = '0';
+        this.scrubberRange.max = String(Math.max(0, total - 1));
+        this.scrubberRange.value = '0';
+      }
+
+      // Render failure and compaction ticks behind the scrubber track
+      if (this.scrubberTicks && trace && total > 1) {
+        this.scrubberTicks.innerHTML = '';
+        trace.steps.forEach((s, idx) => {
+          const isFail = s.events.some(e => e.type === 'AllocationFailed' || e.type === 'PageFault');
+          const isComp = s.events.some(e => e.type === 'CompactionCompleted' || e.type === 'CompactionStarted');
+
+          if (isFail || isComp) {
+            const tick = document.createElement('div');
+            tick.className = `scrubber-tick-item ${isFail ? 'tick-bad' : 'tick-accent'}`;
+            tick.style.left = `${(idx / (total - 1)) * 100}%`;
+            this.scrubberTicks.appendChild(tick);
+          }
+        });
+      }
+    }
+
+    updateView() {
+      const trace = this.engine.trace;
+      const step = this.engine.currentStep;
+      if (!trace || !step) return;
+
+      const currentIdx = this.engine.currentStepIndex;
+      const total = this.engine.totalSteps;
+      const prevStep = (this.lastRenderedStep >= 0 && this.lastRenderedStep < total)
+        ? trace.steps[this.lastRenderedStep]
+        : null;
+
+      // Animation decision
+      const isOneStepForward = (currentIdx === this.lastRenderedStep + 1);
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const shouldAnimate = isOneStepForward && !this.isScrubbing && !reducedMotion;
+
+      // 1. Update Transport Bar State
+      if (this.stepCounter) this.stepCounter.textContent = `${currentIdx + 1} / ${total}`;
+      if (this.scrubberRange) {
+        this.scrubberRange.value = String(currentIdx);
+        const pct = total > 1 ? (currentIdx / (total - 1)) * 100 : 0;
+        this.scrubberRange.style.setProperty('--track-bg', `linear-gradient(to right, var(--accent) 0%, var(--accent) ${pct}%, var(--rule) ${pct}%, var(--rule) 100%)`);
+      }
+
+      if (this.btnPlayPause && this.playIconSlot) {
+        if (this.engine.isPlaying) {
+          this.btnPlayPause.setAttribute('aria-label', 'Pause');
+          this.playIconSlot.innerHTML = `<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="5.5" y1="3.5" x2="5.5" y2="12.5" /><line x1="10.5" y1="3.5" x2="10.5" y2="12.5" /></svg>`;
+        } else {
+          this.btnPlayPause.setAttribute('aria-label', 'Play');
+          this.playIconSlot.innerHTML = `<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M5 3.5 L12 8 L5 12.5 Z" /></svg>`;
+        }
+      }
+
+      // 2. Render Left Panel (Contiguous vs Paging)
+      if (trace.subsystem === 'contiguous') {
+        if (this.headingMemoryPanel) this.headingMemoryPanel.textContent = 'Memory';
+        if (this.contiguousViewport) this.contiguousViewport.hidden = false;
+        if (this.pagingViewport) this.pagingViewport.hidden = true;
+
+        const memSize = step.snapshot?.contiguous?.memory_size || 1000;
+
+        ContiguousRenderer.renderContiguous(
+          this.memoryStrip,
+          step,
+          prevStep,
+          shouldAnimate,
+          (block, el, ev) => this.showBlockPopover(block, el, ev)
+        );
+
+        ContiguousRenderer.renderAddressRuler(this.addressRuler, memSize);
+      } else {
+        if (this.headingMemoryPanel) this.headingMemoryPanel.textContent = 'Frames';
+        if (this.contiguousViewport) this.contiguousViewport.hidden = true;
+        if (this.pagingViewport) this.pagingViewport.hidden = false;
+
+        PagingRenderer.renderPaging(
+          this.pagingTableWrapper,
+          this.pagingThead,
+          this.pagingTbody,
+          this.pagingTfoot,
+          trace,
+          currentIdx,
+          shouldAnimate
+        );
+      }
+
+      // 3. Step Narration
+      if (this.narrationText) {
+        this.narrationText.innerHTML = UIController.narrate(step.events, step, prevStep, trace);
+      }
+
+      // 4. Right Panel 1: Metrics Table & Step Chart
+      if (this.headingMetricsPanel) {
+        this.headingMetricsPanel.textContent = trace.subsystem === 'contiguous' ? 'Fragmentation' : 'Faults';
+      }
+      MetricsRenderer.renderMetrics(this.metricsTbody, step, prevStep, trace);
+      MetricsRenderer.renderStepChart(this.stepChartSvg, trace, currentIdx, (seekIdx) => {
+        this.engine.goToStep(seekIdx);
+      });
+
+      // 5. Right Panel 2: Events List
+      EventRenderer.renderEvents(this.eventsList, step);
+
+      this.lastRenderedStep = currentIdx;
+    }
+
+    showBlockPopover(block, el, ev) {
+      if (!this.blockPopover) return;
+      if (!block) {
+        this.blockPopover.setAttribute('hidden', '');
+        return;
+      }
+
+      const idVal = block.id || '—';
+      const pidVal = block.pid || '—';
+      const startVal = block.start;
+      const sizeVal = block.size;
+      const endVal = block.start + block.size;
+      const stateVal = block.state;
+
+      document.getElementById('popover-id').textContent = idVal;
+      document.getElementById('popover-pid').textContent = pidVal;
+      document.getElementById('popover-start').textContent = startVal;
+      document.getElementById('popover-size').textContent = sizeVal;
+      document.getElementById('popover-end').textContent = endVal;
+      document.getElementById('popover-state').textContent = stateVal;
+
+      // Position popover
+      const rect = el.getBoundingClientRect();
+      const popoverWidth = 180;
+      let left = rect.left + rect.width / 2 - popoverWidth / 2;
+      left = Math.max(16, Math.min(window.innerWidth - popoverWidth - 16, left));
+      const top = rect.bottom + 8;
+
+      this.blockPopover.style.left = `${left}px`;
+      this.blockPopover.style.top = `${top}px`;
+      this.blockPopover.removeAttribute('hidden');
+
+      // Also highlight tick on address ruler
+      const memSize = this.engine.currentStep?.snapshot?.contiguous?.memory_size || 1000;
+      ContiguousRenderer.renderAddressRuler(this.addressRuler, memSize, block.start);
+    }
+
+    /**
+     * Generates one clear, informative sentence explaining mechanism and result,
+     * with IDs and numbers in mono and coloured with their process colour.
+     */
+    static narrate(stepEvents, step, prevStep, trace) {
+      const numSpan = (n) => `<span class="narrate-num mono">${n}</span>`;
+      const pidSpan = (p) => {
+        const color = ContiguousRenderer.getPidColor(p);
+        return `<span class="narrate-pid mono" style="color:${color}">${p}</span>`;
+      };
+      const idSpan = (id, p) => {
+        const color = ContiguousRenderer.getPidColor(p);
+        return `<span class="narrate-id mono" style="color:${color}">${id}</span>`;
+      };
+
+      const formatPolicy = (pol) => {
+        if (!pol) return 'First-Fit';
+        return pol.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('-');
+      };
+
+      if (!stepEvents || stepEvents.length === 0) {
+        if (step?.stepIndex === 0) {
+          if (trace?.subsystem === 'contiguous') {
+            const memSize = step.snapshot?.contiguous?.memory_size || 1000;
+            const holes = step.snapshot?.contiguous?.frag?.hole_count || 0;
+            return `Initial state: ${numSpan(memSize)} units with ${numSpan(holes)} free holes ready for allocation.`;
+          } else {
+            const frames = trace?.header?.config?.frames || 3;
+            return `Initial state: ${numSpan(frames)} physical frames, global FIFO replacement.`;
+          }
+        }
+        return 'Memory state unchanged in this step.';
+      }
+
+      const pDec = stepEvents.find(e => e.type === 'PlacementDecided');
+      const bAlloc = stepEvents.find(e => e.type === 'BlockAllocated');
+      const bSplit = stepEvents.find(e => e.type === 'BlockSplit');
+      const failEv = stepEvents.find(e => e.type === 'AllocationFailed');
+      const freedEv = stepEvents.find(e => e.type === 'BlockFreed');
+      const coalEv = stepEvents.find(e => e.type === 'BlocksCoalesced');
+      const compDone = stepEvents.find(e => e.type === 'CompactionCompleted');
+      const freeRej = stepEvents.find(e => e.type === 'FreeRejected');
+      const allocRej = stepEvents.find(e => e.type === 'AllocRejected');
+
+      // Paging events
+      const hitEv = stepEvents.find(e => e.type === 'PageHit');
+      const faultEv = stepEvents.find(e => e.type === 'PageFault');
+      const evictEv = stepEvents.find(e => e.type === 'PageEvicted');
+      const loadEv = stepEvents.find(e => e.type === 'PageLoaded');
+      const frameAllocEv = stepEvents.find(e => e.type === 'FrameAllocated');
+      const procSpawn = stepEvents.find(e => e.type === 'ProcessSpawned');
+
+      // Template 1: PlacementDecided + BlockSplit + BlockAllocated
+      if (pDec && bAlloc) {
+        const policy = formatPolicy(pDec.data.policy);
+        const req = pDec.data.requested;
+        const scanned = pDec.data.scanned;
+        const start = bAlloc.data.start;
+        const holeSize = pDec.data.hole ? pDec.data.hole.size : (bAlloc.data.size + (bSplit?.data?.remainder?.size || 0));
+        const rem = bSplit?.data?.remainder ? bSplit.data.remainder.size : 0;
+        const pid = bAlloc.data.pid;
+
+        if (rem > 0) {
+          return `${pidSpan(pid)} requests ${numSpan(req)}. ${policy} scanned ${numSpan(scanned)} ${scanned === 1 ? 'hole' : 'holes'} and placed it at ${numSpan(start)} in the ${numSpan(holeSize)}-unit hole, leaving ${numSpan(rem)} free.`;
+        }
+        return `${pidSpan(pid)} requests ${numSpan(req)}. ${policy} scanned ${numSpan(scanned)} ${scanned === 1 ? 'hole' : 'holes'} and placed it at ${numSpan(start)} in the ${numSpan(holeSize)}-unit hole (exact fit).`;
+      }
+
+      // Template 2: AllocationFailed (FRAGMENTATION or CAPACITY)
+      if (failEv) {
+        const pid = failEv.data.pid;
+        const req = failEv.data.requested;
+        const free = failEv.data.total_free;
+        const largest = failEv.data.largest_hole;
+
+        if (failEv.data.cause === 'FRAGMENTATION') {
+          return `${pidSpan(pid)} requests ${numSpan(req)}. ${numSpan(free)} units are free, but the largest hole is only ${numSpan(largest)}, so the request fails: external fragmentation.`;
+        }
+        return `${pidSpan(pid)} requests ${numSpan(req)}. Only ${numSpan(free)} units are free in total, so the request fails: not enough memory.`;
+      }
+
+      // Template 3: BlockFreed (+ BlocksCoalesced)
+      if (freedEv) {
+        const pid = freedEv.data.pid;
+        const id = freedEv.data.id;
+        const start = freedEv.data.start;
+        const size = freedEv.data.size;
+
+        if (coalEv) {
+          const mergedSize = coalEv.data.merged_size || coalEv.data.size || size;
+          return `${pidSpan(pid)} frees ${idSpan(id, pid)} (start ${numSpan(start)}, size ${numSpan(size)}); it merges with its free neighbours into one hole of ${numSpan(mergedSize)}.`;
+        }
+        return `${pidSpan(pid)} frees ${idSpan(id, pid)} (start ${numSpan(start)}, size ${numSpan(size)}), leaving a free hole of ${numSpan(size)}.`;
+      }
+
+      // Template 4: Compaction
+      if (compDone) {
+        const moved = compDone.data.blocks_moved;
+        const units = compDone.data.units_moved;
+        const largest = compDone.data.largest_after;
+        const hole = step?.snapshot?.contiguous?.blocks?.find(b => b.state === 'free');
+        const holeStart = hole ? hole.start : (step?.snapshot?.contiguous?.memory_size - largest);
+        return `Compaction moves ${numSpan(moved)} blocks, ${numSpan(units)} units in total, leaving one hole of ${numSpan(largest)} at ${numSpan(holeStart)}.`;
+      }
+
+      // Template 5: Rejections
+      if (freeRej) {
+        const pid = freeRej.data.pid;
+        const id = freeRej.data.id;
+        const reason = freeRej.data.reason || 'double free';
+        return `Rejected: ${pidSpan(pid)} frees ${idSpan(id, pid)} twice (${reason}). Memory is unchanged.`;
+      }
+      if (allocRej) {
+        const pid = allocRej.data.pid;
+        const reason = allocRej.data.reason || 'invalid size';
+        return `Rejected: ${pidSpan(pid)} allocation request rejected (${reason}). Memory is unchanged.`;
+      }
+
+      // Template 6: Paging Events
+      if (hitEv) {
+        const pid = hitEv.data.pid;
+        const vpn = hitEv.data.vpn;
+        const frame = hitEv.data.frame;
+        return `${pidSpan(pid)} reads page ${numSpan(vpn)}: hit in frame ${numSpan(frame)}.`;
+      }
+
+      if (faultEv) {
+        const pid = faultEv.data.pid;
+        const vpn = faultEv.data.vpn;
+        const kind = (faultEv.data.kind || 'page fault').toLowerCase();
+        const policy = trace?.header?.policy ? trace.header.policy.toUpperCase() : 'FIFO';
+
+        if (evictEv) {
+          return `${pidSpan(pid)} reads page ${numSpan(vpn)}: page fault (${kind}). No free frame; ${policy} evicts page ${numSpan(evictEv.data.vpn)} from frame ${numSpan(evictEv.data.frame)} (it was loaded first), and page ${numSpan(vpn)} is loaded there.`;
+        }
+        const frameNum = loadEv ? loadEv.data.frame : (frameAllocEv ? frameAllocEv.data.frame : 0);
+        return `${pidSpan(pid)} reads page ${numSpan(vpn)}: page fault (${kind}). Frame ${numSpan(frameNum)} was free, so page ${numSpan(vpn)} is loaded there.`;
+      }
+
+      if (procSpawn) {
+        const pid = procSpawn.data.pid;
+        const pages = procSpawn.data.pages;
+        return `Process ${pidSpan(pid)} spawned with ${numSpan(pages)} virtual pages.`;
+      }
+
+      // Fallback: list event names
+      return stepEvents.map(e => e.type).join(', ');
+    }
+  }
+
+  /**
+   * Sample Traces: Preloaded fixtures for AC-1, AC-2, AC-3
+   * Strictly preserved for test suite compatibility.
    */
   const SAMPLE_TRACES = {
     ac1: `{"type":"TraceHeader","schema":1,"engine":"0.1.0","git":"3bcf43b","workload":"silberschatz_5_holes","policy":"first-fit","config":{"memory_size":1740,"alignment":1,"min_split":1,"compaction":"never"},"trace_level":1}
@@ -2257,346 +3402,6 @@ kbd {
 {"seq":20,"step":5,"type":"Snapshot","step":5,"paging":{"frames":[{"frame":0,"pid":"P0","vpn":2,"referenced":true,"dirty":false},{"frame":1,"pid":"P0","vpn":0,"referenced":true,"dirty":false},{"frame":2,"pid":"P0","vpn":1,"referenced":true,"dirty":false}],"page_tables":{"P0":[{"vpn":0,"frame":1,"present":true,"referenced":true,"dirty":false},{"vpn":1,"frame":2,"present":true,"referenced":true,"dirty":false},{"vpn":2,"frame":0,"present":true,"referenced":true,"dirty":false}]},"policy_state":{"policy":"fifo","queue":[1,2,0]}}}
 {"type":"RunSummary","metrics":{"references":5,"hits":1,"faults":4,"compulsory_faults":4,"capacity_faults":0,"evictions":1,"write_backs":0,"fault_rate":0.8,"hit_rate":0.2}}`
   };
-
-  /**
-   * UIController: Binds DOM elements, manages interactions, keyboard shortcuts, and view rendering.
-   */
-  class UIController {
-    constructor() {
-      this.engine = new PlaybackEngine();
-      this.selectedBlock = null;
-
-      this.initDomReferences();
-      this.bindEvents();
-
-      this.engine.addListener((eventType) => {
-        this.updateView(eventType);
-      });
-
-      console.log('MemForge viewer initialized.');
-    }
-
-    initDomReferences() {
-      // Buttons & Inputs
-      this.fileInput = document.getElementById('trace-file-input');
-      this.loadFileBtn = document.getElementById('btn-load-file');
-      this.dropzone = document.getElementById('trace-dropzone');
-      this.sampleBtnAc1 = document.getElementById('btn-sample-ac1');
-      this.sampleBtnAc2 = document.getElementById('btn-sample-ac2');
-      this.sampleBtnAc3 = document.getElementById('btn-sample-ac3');
-
-      // Transport controls
-      this.btnPlay = document.getElementById('btn-play');
-      this.btnPrev = document.getElementById('btn-prev');
-      this.btnNext = document.getElementById('btn-next');
-      this.btnReset = document.getElementById('btn-reset');
-      this.btnFailure = document.getElementById('btn-failure');
-      this.scrubSlider = document.getElementById('scrub-slider');
-      this.speedSelect = document.getElementById('playback-speed');
-      this.stepDisplay = document.getElementById('step-display');
-      this.stepTotal = document.getElementById('step-total');
-
-      // Containers & Panels
-      this.notificationContainer = document.getElementById('notification-container');
-      this.metaWorkload = document.getElementById('meta-workload');
-      this.metaPolicy = document.getElementById('meta-policy');
-      this.metaSubsystem = document.getElementById('meta-subsystem');
-      this.metaConfig = document.getElementById('meta-config');
-
-      this.vizContainer = document.getElementById('viz-container');
-      this.metricsContainer = document.getElementById('metrics-container');
-      this.eventsContainer = document.getElementById('events-container');
-      this.inspectorContainer = document.getElementById('inspector-container');
-      this.rulerContainer = document.getElementById('ruler-container');
-      this.emptyState = document.getElementById('empty-state');
-      this.dashboardGrid = document.getElementById('dashboard-grid');
-    }
-
-    bindEvents() {
-      // File Input Trigger
-      if (this.loadFileBtn && this.fileInput) {
-        this.loadFileBtn.addEventListener('click', () => this.fileInput.click());
-        this.fileInput.addEventListener('change', (e) => {
-          const file = e.target.files && e.target.files[0];
-          if (file) this.readFile(file);
-        });
-      }
-
-      // Drag and Drop
-      if (this.dropzone) {
-        ['dragenter', 'dragover'].forEach(name => {
-          this.dropzone.addEventListener(name, (e) => {
-            e.preventDefault();
-            this.dropzone.style.borderColor = 'var(--border-focus)';
-            this.dropzone.style.backgroundColor = 'rgba(0, 210, 255, 0.05)';
-          });
-        });
-        ['dragleave', 'drop'].forEach(name => {
-          this.dropzone.addEventListener(name, (e) => {
-            e.preventDefault();
-            this.dropzone.style.borderColor = 'var(--border-subtle)';
-            this.dropzone.style.backgroundColor = 'transparent';
-          });
-        });
-        this.dropzone.addEventListener('drop', (e) => {
-          const dt = e.dataTransfer;
-          if (dt && dt.files && dt.files.length > 0) {
-            this.readFile(dt.files[0]);
-          }
-        });
-      }
-
-      // Sample Trace Buttons
-      if (this.sampleBtnAc1) {
-        this.sampleBtnAc1.addEventListener('click', () => this.loadRawTraceString(SAMPLE_TRACES.ac1, 'AC-1 (First-Fit Fragmentation)'));
-      }
-      if (this.sampleBtnAc2) {
-        this.sampleBtnAc2.addEventListener('click', () => this.loadRawTraceString(SAMPLE_TRACES.ac2, 'AC-2 (Sliding Compaction)'));
-      }
-      if (this.sampleBtnAc3) {
-        this.sampleBtnAc3.addEventListener('click', () => this.loadRawTraceString(SAMPLE_TRACES.ac3, 'AC-3 (Paging FIFO)'));
-      }
-
-      // Transport Control Actions
-      if (this.btnPlay) this.btnPlay.addEventListener('click', () => this.engine.togglePlay());
-      if (this.btnPrev) this.btnPrev.addEventListener('click', () => this.engine.prevStep());
-      if (this.btnNext) this.btnNext.addEventListener('click', () => this.engine.nextStep());
-      if (this.btnReset) this.btnReset.addEventListener('click', () => this.engine.reset());
-      if (this.btnFailure) this.btnFailure.addEventListener('click', () => this.engine.jumpToNextFailureOrFault());
-
-      if (this.speedSelect) {
-        this.speedSelect.addEventListener('change', (e) => {
-          this.engine.setSpeed(parseInt(e.target.value, 10));
-        });
-      }
-
-      if (this.scrubSlider) {
-        this.scrubSlider.addEventListener('input', (e) => {
-          this.engine.goToStep(parseInt(e.target.value, 10));
-        });
-      }
-
-      // Keyboard Shortcuts
-      window.addEventListener('keydown', (e) => {
-        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) {
-          return; // Ignore inside form inputs
-        }
-        if (e.code === 'Space') {
-          e.preventDefault();
-          this.engine.togglePlay();
-        } else if (e.code === 'ArrowRight' || e.key === 'j') {
-          e.preventDefault();
-          this.engine.nextStep();
-        } else if (e.code === 'ArrowLeft' || e.key === 'k') {
-          e.preventDefault();
-          this.engine.prevStep();
-        } else if (e.code === 'Home' || e.key === 'r') {
-          e.preventDefault();
-          this.engine.reset();
-        } else if (e.key === 'f') {
-          e.preventDefault();
-          this.engine.jumpToNextFailureOrFault();
-        }
-      });
-    }
-
-    readFile(file) {
-      this.clearNotifications();
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target.result;
-        this.loadRawTraceString(text, file.name);
-      };
-      reader.onerror = () => {
-        this.showError(`Failed to read file "${file.name}": ${reader.error?.message || 'Unknown read error.'}`);
-      };
-      reader.readAsText(file);
-    }
-
-    loadRawTraceString(rawText, sourceName) {
-      this.clearNotifications();
-      const result = TraceParser.parseTrace(rawText);
-      if (!result.ok) {
-        this.showError(result.error);
-        return;
-      }
-
-      const trace = result.trace;
-      trace.sourceName = sourceName;
-      this.engine.loadTrace(trace);
-
-      // Display warnings if trace capped or incomplete
-      if (trace.warnings && trace.warnings.length > 0) {
-        trace.warnings.forEach(w => this.showWarning(w));
-      }
-    }
-
-    showError(msg) {
-      if (!this.notificationContainer) return;
-      const el = document.createElement('div');
-      el.className = 'banner banner-error';
-      el.innerHTML = `
-        <span class="banner-icon">⚠️</span>
-        <div class="banner-content">
-          <div class="banner-title">Error Loading Trace</div>
-          <div>${msg}</div>
-        </div>
-      `;
-      this.notificationContainer.appendChild(el);
-    }
-
-    showWarning(msg) {
-      if (!this.notificationContainer) return;
-      const el = document.createElement('div');
-      el.className = 'banner banner-warning';
-      el.innerHTML = `
-        <span class="banner-icon">⚡</span>
-        <div class="banner-content">
-          <div class="banner-title">Notice</div>
-          <div>${msg}</div>
-        </div>
-      `;
-      this.notificationContainer.appendChild(el);
-    }
-
-    clearNotifications() {
-      if (this.notificationContainer) {
-        this.notificationContainer.innerHTML = '';
-      }
-    }
-
-    updateView(eventType) {
-      const step = this.engine.currentStep;
-      const trace = this.engine.trace;
-
-      if (!trace || !step) {
-        if (this.emptyState) this.emptyState.style.display = 'flex';
-        if (this.dashboardGrid) this.dashboardGrid.style.display = 'none';
-        return;
-      }
-
-      if (this.emptyState) this.emptyState.style.display = 'none';
-      if (this.dashboardGrid) this.dashboardGrid.style.display = 'grid';
-
-      // 1. Update Header Pills
-      if (eventType === 'load') {
-        const h = trace.header;
-        if (this.metaWorkload) this.metaWorkload.innerHTML = `Workload: <strong>${h.workload || '—'}</strong>`;
-        if (this.metaPolicy) this.metaPolicy.innerHTML = `Policy: <strong>${h.policy || '—'}</strong>`;
-        if (this.metaSubsystem) {
-          this.metaSubsystem.className = `meta-pill subsystem-${trace.subsystem}`;
-          this.metaSubsystem.innerHTML = `Mode: <strong>${trace.subsystem.toUpperCase()}</strong>`;
-        }
-        if (this.metaConfig) {
-          const cfg = h.config || {};
-          const cfgStr = trace.subsystem === 'contiguous'
-            ? `M=${cfg.memory_size || '?'}`
-            : `F=${cfg.frames || '?'}, P=${cfg.page_size || '?'}`;
-          this.metaConfig.innerHTML = `Config: <strong>${cfgStr}</strong>`;
-        }
-
-        // Configure slider bounds
-        if (this.scrubSlider) {
-          this.scrubSlider.min = '0';
-          this.scrubSlider.max = String(Math.max(0, trace.totalSteps - 1));
-        }
-      }
-
-      // 2. Update Transport Controls State
-      const currentIdx = this.engine.currentStepIndex;
-      const totalSteps = this.engine.totalSteps;
-
-      if (this.stepDisplay) this.stepDisplay.textContent = currentIdx + 1;
-      if (this.stepTotal) this.stepTotal.textContent = `/ ${totalSteps}`;
-      if (this.scrubSlider) this.scrubSlider.value = String(currentIdx);
-
-      if (this.btnPlay) {
-        this.btnPlay.innerHTML = this.engine.isPlaying ? '❚❚' : '▶';
-        this.btnPlay.setAttribute('aria-label', this.engine.isPlaying ? 'Pause' : 'Play');
-      }
-
-      if (this.btnPrev) this.btnPrev.disabled = currentIdx === 0;
-      if (this.btnReset) this.btnReset.disabled = currentIdx === 0;
-      if (this.btnNext) this.btnNext.disabled = currentIdx >= totalSteps - 1;
-
-      // 3. Render Memory Map or Paging Grid
-      if (trace.subsystem === 'contiguous') {
-        ContiguousRenderer.renderMemoryMap(this.vizContainer, step, (block, memSize) => {
-          this.updateBlockInspector(block, memSize);
-        });
-        this.renderRuler(step.snapshot?.contiguous?.memory_size || 1000);
-      } else {
-        PagingRenderer.renderPaging(this.vizContainer, step);
-        if (this.rulerContainer) this.rulerContainer.innerHTML = '';
-      }
-
-      // 4. Render Metrics & Events
-      MetricsRenderer.renderMetrics(this.metricsContainer, step, trace);
-      EventRenderer.renderEvents(this.eventsContainer, step);
-    }
-
-    renderRuler(memSize) {
-      if (!this.rulerContainer) return;
-      const q1 = Math.round(memSize * 0.25);
-      const q2 = Math.round(memSize * 0.5);
-      const q3 = Math.round(memSize * 0.75);
-      this.rulerContainer.innerHTML = `
-        <span>0</span>
-        <span>${q1}</span>
-        <span>${q2}</span>
-        <span>${q3}</span>
-        <span>${memSize}</span>
-      `;
-    }
-
-    updateBlockInspector(block, memSize) {
-      if (!this.inspectorContainer) return;
-      if (!block) {
-        this.inspectorContainer.innerHTML = `
-          <div class="inspector-header">Selected Block</div>
-          <div style="color:var(--text-muted);font-size:0.8rem;">Click on any block in the memory map to inspect its details.</div>
-        `;
-        return;
-      }
-
-      const isFree = block.state === 'free';
-      const range = `[${block.start}, ${block.start + block.size})`;
-      const intFrag = (!isFree && block.requested) ? (block.size - block.requested) : 0;
-
-      this.inspectorContainer.innerHTML = `
-        <div class="inspector-header">
-          <span>Selected Block</span>
-          <span class="meta-pill" style="font-size:0.65rem;">${isFree ? 'FREE' : 'ALLOCATED'}</span>
-        </div>
-        <div class="inspector-grid">
-          <div class="inspector-item">
-            <span class="inspector-label">Process ID</span>
-            <span class="inspector-val">${block.pid || '—'}</span>
-          </div>
-          <div class="inspector-item">
-            <span class="inspector-label">Allocation ID</span>
-            <span class="inspector-val">${block.id || '—'}</span>
-          </div>
-          <div class="inspector-item">
-            <span class="inspector-label">Address Range</span>
-            <span class="inspector-val">${range}</span>
-          </div>
-          <div class="inspector-item">
-            <span class="inspector-label">Granted Size</span>
-            <span class="inspector-val">${block.size} units</span>
-          </div>
-          <div class="inspector-item">
-            <span class="inspector-label">Requested</span>
-            <span class="inspector-val">${block.requested !== undefined ? `${block.requested} units` : '—'}</span>
-          </div>
-          <div class="inspector-item">
-            <span class="inspector-label">Internal Frag</span>
-            <span class="inspector-val">${intFrag > 0 ? `${intFrag} units` : '0'}</span>
-          </div>
-        </div>
-      `;
-    }
-  }
 
   // Auto-initialize when loaded in browser
   if (typeof document !== 'undefined') {

@@ -16,6 +16,14 @@
     return () => clearInterval(t);
   });
   const st = $derived(demo?.ok ? demo.steps[i] : null);
+  const scenarios = [
+    { title: 'One request, three policies', what: 'Four requests on five holes under First-, Best- and Worst-Fit side by side.', result: 'BF places 426; FF and WF fail', href: '#/contiguous?preset=requests&mode=compare' },
+    { title: 'Fragmentation, then compaction', what: 'The 426 request fails with 959 units free. Compact, then retry it.', result: '7 blocks, 781 units moved', href: '#/contiguous?preset=requests&mode=first-fit' },
+    { title: 'Page replacement', what: 'The textbook reference string with 3 frames under FIFO, LRU and OPT.', result: '15 · 12 · 9 faults', href: '#/paging?preset=ac3&mode=compare' },
+    { title: "Belady's anomaly", what: 'With FIFO, giving the process a 4th frame causes more faults, not fewer.', result: '9 faults → 10', href: '#/paging?preset=ac4&mode=fifo' },
+    { title: 'Dirty pages and two processes', what: 'Two processes share 4 frames; modified victims are written back first.', result: 'write-backs', href: '#/paging?preset=multi&mode=lru' },
+    { title: 'Address translation', what: 'Virtual addresses split into page and offset, mapped to physical addresses.', result: 'VA → PA', href: '#/paging?preset=va&mode=fifo' },
+  ];
   const palette = ['var(--p0)', 'var(--p1)', 'var(--p2)', 'var(--p3)', 'var(--p4)', 'var(--p5)'];
   const colorOf = (p: string) => (p === 'SYS' ? 'var(--sys)' : palette[(Number(p.replace(/\D/g, '')) || 0) % palette.length]);
 </script>
@@ -59,6 +67,23 @@
     <p>Step through a reference string under FIFO, LRU and OPT in the textbook frames table, and find Belady's anomaly, where more frames cause more faults.</p>
     <span class="go">Paging lab <Icon name="arrow" /></span>
   </a>
+</section>
+
+<section class="scenarios" aria-labelledby="scen">
+  <h2 id="scen">Classic scenarios</h2>
+  <p class="sub">Each opens a lab with the example loaded; the numbers are the ones the acceptance tests check.</p>
+  <ol>
+    {#each scenarios as sc, i}
+      <li>
+        <a href={sc.href}>
+          <span class="mono n">{i + 1}</span>
+          <span class="t"><strong>{sc.title}</strong><span>{sc.what}</span></span>
+          <span class="mono r">{sc.result}</span>
+          <Icon name="arrow" />
+        </a>
+      </li>
+    {/each}
+  </ol>
 </section>
 
 <section class="facts" aria-label="How it works">
@@ -177,6 +202,52 @@
     margin-top: 6px;
     color: var(--accent);
     font-weight: 500;
+  }
+  .scenarios {
+    margin-top: 56px;
+  }
+  .scenarios h2 {
+    font-size: 22px;
+  }
+  .sub {
+    margin-top: 6px;
+    color: var(--muted);
+  }
+  .scenarios ol {
+    list-style: none;
+    margin: 16px 0 0;
+    padding: 0;
+    border-top: 1px solid var(--rule);
+  }
+  .scenarios a {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) auto 16px;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 8px;
+    border-bottom: 1px solid var(--rule);
+    color: inherit;
+    text-decoration: none;
+    transition: background 160ms var(--ease);
+  }
+  .scenarios a:hover {
+    background: var(--panel);
+  }
+  .n {
+    color: var(--faint);
+  }
+  .t {
+    display: grid;
+    gap: 2px;
+  }
+  .t span {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .r {
+    color: var(--accent);
+    font-size: 13px;
+    white-space: nowrap;
   }
   .facts {
     display: grid;

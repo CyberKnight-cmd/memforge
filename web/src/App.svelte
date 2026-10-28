@@ -2,15 +2,19 @@
   import Home from './routes/Home.svelte';
   import Contiguous from './routes/Contiguous.svelte';
   import Paging from './routes/Paging.svelte';
+  import Replay from './routes/Replay.svelte';
   import Icon from './components/Icon.svelte';
+  import { routeName } from './lib/route';
 
-  const routes = { '': Home, contiguous: Contiguous, paging: Paging } as const;
+  const routes = { '': Home, contiguous: Contiguous, paging: Paging, replay: Replay } as const;
   type Route = keyof typeof routes;
-  const current = () => (location.hash.replace(/^#\/?/, '') as Route) in routes ? (location.hash.replace(/^#\/?/, '') as Route) : '';
+  const current = (): Route => (routeName() in routes ? (routeName() as Route) : '');
   let route = $state<Route>(current());
+  let hash = $state(location.hash);
   $effect(() => {
     const on = () => {
       route = current();
+      hash = location.hash;
       window.scrollTo(0, 0);
     };
     addEventListener('hashchange', on);
@@ -37,6 +41,7 @@
     <a href="#/" aria-current={route === '' ? 'page' : undefined}>Overview</a>
     <a href="#/contiguous" aria-current={route === 'contiguous' ? 'page' : undefined}>Contiguous memory</a>
     <a href="#/paging" aria-current={route === 'paging' ? 'page' : undefined}>Paging</a>
+    <a href="#/replay" aria-current={route === 'replay' ? 'page' : undefined}>Replay a trace</a>
   </nav>
   <button class="btn ghost icon" onclick={toggleTheme} aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}>
     <Icon name={theme === 'light' ? 'moon' : 'sun'} />
@@ -44,7 +49,7 @@
 </header>
 
 <main>
-  <Page />
+  {#key hash}<Page />{/key}
 </main>
 
 <style>

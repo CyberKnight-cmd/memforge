@@ -24,6 +24,7 @@ export type Run = { ok: true; steps: Step[]; summary: Record<string, number> } |
 export type ContOp =
   | { kind: 'alloc'; pid: string; id: string; size: number }
   | { kind: 'free'; pid: string; id: string }
+  | { kind: 'terminate'; pid: string }
   | { kind: 'compact' };
 
 export const PLACEMENT = ['first-fit', 'best-fit', 'worst-fit'] as const;
@@ -38,26 +39,54 @@ export const POLICY_LABEL: Record<string, string> = {
 };
 
 const engine = () => loadEngine(() => fetch(`${import.meta.env.BASE_URL}memsim.wasm`).then((r) => r.arrayBuffer()));
-export const engineReady = engine();
 
 export function contiguousText(memorySize: number, ops: ContOp[]): string {
   const lines = ['schema 1', 'kind contiguous', `memory_size ${memorySize}`, ''];
   for (const op of ops) {
     if (op.kind === 'alloc') lines.push(`alloc ${op.pid} ${op.id} ${op.size}`);
     else if (op.kind === 'free') lines.push(`free ${op.pid} ${op.id}`);
+    else if (op.kind === 'terminate') lines.push(`terminate ${op.pid}`);
     else lines.push('compact');
   }
   return lines.join('\n') + '\n';
 }
 
-export function pagingText(frames: number, refs: number[]): string {
-  const pages = Math.max(1, ...refs.map((r) => r + 1));
-  const lines = ['schema 1', 'kind paging', 'page_size 4096', `frames ${frames}`, '', `spawn P0 ${pages}`];
-  for (const r of refs) lines.push(`access P0 ${r}`);
+// One reference: [P<n>:]<page> or [P<n>:]@<virtual address>, then an optional w for a write.
+export type Ref = { pid: string; vpn: number; va: number | null; write: boolean };
+export function parseRefs(text: string, pageSize: number): { refs: Ref[]; bad: string[] } {
+  const refs: Ref[] = [];
+  const bad: string[] = [];
+  for (const tok of text.split(/[\s,]+/).filter(Boolean)) {
+    const m = /^(?:(P\d{1,2}):)?(@?)(\d{1,7})(w?)$/i.exec(tok);
+    if (!m) {
+      bad.push(tok);
+      continue;
+    }
+    const n = Number(m[3]);
+    const va = m[2] ? n : null;
+    const vpn = va === null ? n : Math.floor(n / pageSize);
+    if (vpn > 255) bad.push(tok);
+    else refs.push({ pid: (m[1] ?? 'P0').toUpperCase(), vpn, va, write: m[4] !== '' });
+  }
+  return { refs, bad };
+}
+
+// Each process is spawned first with just enough pages for its highest reference.
+export function processesOf(refs: Ref[]): { pid: string; pages: number }[] {
+  const out = new Map<string, number>();
+  for (const r of refs) out.set(r.pid, Math.max(out.get(r.pid) ?? 1, r.vpn + 1));
+  if (!out.size) out.set('P0', 1);
+  return [...out].map(([pid, pages]) => ({ pid, pages }));
+}
+
+export function pagingText(frames: number, pageSize: number, refs: Ref[]): string {
+  const lines = ['schema 1', 'kind paging', `page_size ${pageSize}`, `frames ${frames}`, ''];
+  for (const p of processesOf(refs)) lines.push(`spawn ${p.pid} ${p.pages}`);
+  for (const r of refs) lines.push(`access ${r.pid} ${r.va === null ? r.vpn : '@' + r.va}${r.write ? ' w' : ''}`);
   return lines.join('\n') + '\n';
 }
 
-function toSteps(lines: TraceLine[]): Run {
+export function toSteps(lines: TraceLine[]): Run {
   const steps: Step[] = [];
   let pending: TraceLine[] = [];
   let summary: Record<string, number> = {};
@@ -133,6 +162,11 @@ export function narrate(events: TraceLine[], policy: string): Tok[] {
       s(' units copied), leaving one hole of '), n(compacted.largest_after), s('.'),
     ];
   }
+  const term = by('ProcessTerminated');
+  if (term && term.freed_blocks !== undefined && !by('ProcessSpawned')) {
+    if (!term.freed_blocks) return [id(term.pid, term.pid), s(' terminates; it held no memory.')];
+    return [id(term.pid, term.pid), s(' terminates; the OS frees all '), n(term.freed_blocks), s(term.freed_blocks === 1 ? ' block' : ' of its blocks'), s(', merging any neighbouring holes.')];
+  }
   if (freed) {
     const out: Tok[] = [id(freed.pid, freed.pid), s(' frees '), id(freed.id, freed.pid), s(' ('), n(freed.size), s(' at '), n(freed.start), s(')')];
     if (merged) out.push(s('; it merges with its free neighbours into one hole of '), n(merged.result.size));
@@ -143,13 +177,22 @@ export function narrate(events: TraceLine[], policy: string): Tok[] {
   const fault = by('PageFault');
   const victim = by('VictimSelected');
   const loaded = by('PageLoaded');
+  const wb = by('PageWrittenBack');
+  const tr = by('AddressTranslated');
   const violation = by('AccessViolation');
-  if (violation) return [s('Access rejected: '), { t: violation.reason === 'OUT_OF_RANGE' ? 'page outside the address space' : 'no such process', k: 'bad' }, s('.')];
-  if (hit) return [s('Page '), n(hit.vpn), s(' is in frame '), n(hit.frame), s(': '), { t: 'hit', k: 'ok' }, s('.')];
+  const spawned = by('ProcessSpawned');
+  if (spawned) return [id(spawned.pid), s(' starts with an address space of '), n(spawned.pages), s(spawned.pages === 1 ? ' page; nothing is in memory yet.' : ' pages; nothing is in memory yet.')];
+  if (violation) return [id(violation.pid), s(' is stopped: '), { t: violation.reason === 'OUT_OF_RANGE' ? 'that address is outside its address space' : 'no such process', k: 'bad' }, s('.')];
+  const who = (x: { pid: string; vpn: number; write: boolean }): Tok[] => [id(x.pid), s(x.write ? ' writes page ' : ' reads page '), n(x.vpn)];
+  const where: Tok[] = tr ? [s(' (address '), n(tr.va), s(' = page '), n(tr.vpn), s(' + offset '), n(tr.offset), s(')')] : [];
+  if (hit) return [...who(hit), ...where, s(': it is in frame '), n(hit.frame), s(', a '), { t: 'hit', k: 'ok' }, s(tr ? `, so the physical address is ${tr.pa}.` : '.')];
   if (fault && loaded) {
-    const out: Tok[] = [s('Page '), n(fault.vpn), s(' is not in memory: '), { t: 'page fault', k: 'bad' }, s('. ')];
-    if (victim) out.push(s(`No free frame, so ${label} evicts page `), n(victim.vpn), s(' from frame '), n(victim.frame), s(`${why(policy)}. `));
-    out.push(s('Page '), n(loaded.vpn), s(' is loaded into frame '), n(loaded.frame), s('.'));
+    const out: Tok[] = [...who(fault), ...where, s(': '), { t: fault.kind === 'COMPULSORY' ? 'page fault (first use)' : 'page fault', k: 'bad' }, s('. ')];
+    if (victim) {
+      out.push(s(`Memory is full, so ${label} evicts `), id(victim.pid), s(' page '), n(victim.vpn), s(' from frame '), n(victim.frame), s(`${why(policy)}`));
+      out.push(wb ? s('; it was modified, so it is written back to disk first. ') : s('. '));
+    } else out.push(s('Frame '), n(loaded.frame), s(' is free. '));
+    out.push(s('The page is loaded into frame '), n(loaded.frame), s(tr ? `; physical address ${tr.pa}.` : '.'));
     return out;
   }
   return [s(events.length ? events.map((e) => e.type).join(', ') : 'Initial state.')];
@@ -187,5 +230,7 @@ export const SILBERSCHATZ_REQUESTS: ContOp[] = [
   { kind: 'alloc', pid: 'P3', id: 'a3', size: 112 },
   { kind: 'alloc', pid: 'P4', id: 'a4', size: 426 },
 ];
-export const AC3_REFS = [7, 0, 1, 2, 0, 3, 0, 4, 2, 3, 0, 3, 2, 1, 2, 0, 1, 7, 0, 1];
-export const AC4_REFS = [1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5];
+export const AC3_REFS = '7 0 1 2 0 3 0 4 2 3 0 3 2 1 2 0 1 7 0 1';
+export const AC4_REFS = '1 2 3 4 1 2 5 1 2 3 4 5';
+export const MULTI_REFS = 'P1:0 P1:1w P2:0 P2:1 P1:2 P2:0w P1:0 P2:2 P1:1 P2:3w P1:3 P2:0';
+export const VA_REFS = '@6700 @120 @9000w @6800 @14000 @200w @6750 @9100';

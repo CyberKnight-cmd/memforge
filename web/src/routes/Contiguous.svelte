@@ -7,6 +7,7 @@
     run, contiguousText, narrate, PLACEMENT, POLICY_LABEL, SILBERSCHATZ_SETUP, SILBERSCHATZ_REQUESTS,
     type ContOp, type Run, type Block,
   } from '../lib/sim';
+  import { query } from '../lib/route';
 
   type Preset = { key: string; label: string; memory: number; ops: ContOp[] };
   const presets: Preset[] = [
@@ -15,11 +16,13 @@
     { key: 'empty', label: 'Empty memory (1024 units)', memory: 1024, ops: [] },
   ];
 
-  let presetKey = $state('holes');
-  let memory = $state(1740);
-  let ops = $state<ContOp[]>([...SILBERSCHATZ_SETUP]);
-  let setupCount = $state(SILBERSCHATZ_SETUP.length);
-  let mode = $state<string>('first-fit');
+  const q = query();
+  const startPreset = presets.find((p) => p.key === q.get('preset')) ?? presets[0];
+  let presetKey = $state(startPreset.key);
+  let memory = $state(startPreset.memory);
+  let ops = $state<ContOp[]>([...startPreset.ops]);
+  let setupCount = $state(startPreset.ops.filter((o) => o.kind === 'alloc' || o.kind === 'free' ? o.pid === 'SYS' : false).length);
+  let mode = $state<string>(q.get('mode') ?? 'first-fit');
   let pid = $state('P1');
   let size = $state(212);
   let runs = $state<Record<string, Run>>({});
@@ -29,7 +32,7 @@
     const p = presets.find((x) => x.key === key)!;
     memory = p.memory;
     ops = [...p.ops];
-    setupCount = p.ops.filter((o) => o.kind !== 'compact' && o.pid === 'SYS').length;
+    setupCount = p.ops.filter((o) => (o.kind === 'alloc' || o.kind === 'free' ? o.pid === 'SYS' : false)).length;
     cursor = null;
   }
 
@@ -55,7 +58,7 @@
 
   let nextId = 0;
   function freshId() {
-    const used = new Set(ops.map((o) => (o.kind === 'compact' ? '' : o.id)));
+    const used = new Set(ops.map((o) => (o.kind === 'alloc' ? o.id : '')));
     do nextId++;
     while (used.has(`r${nextId}`));
     return `r${nextId}`;
@@ -68,6 +71,8 @@
   const allocate = () => size > 0 && push({ kind: 'alloc', pid, id: freshId(), size: Math.round(size) });
   const freeBlock = (b: Block) => push({ kind: 'free', pid: b.pid!, id: b.id! });
   const compactNow = () => push({ kind: 'compact' });
+  const terminate = (p: string) => push({ kind: 'terminate', pid: p });
+  const live = $derived([...new Set((steps[at]?.blocks ?? []).filter((b) => b.state === 'allocated' && b.pid !== 'SYS').map((b) => b.pid!))].sort());
   const undo = () => {
     if (ops.length > setupCount) {
       ops = ops.slice(0, -1);
@@ -84,6 +89,10 @@
   }
 
   const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`;
+  const CW = 420, CH = 90;
+  const cx = (i: number) => (last > firstVisible ? ((i - firstVisible) / (last - firstVisible)) * (CW - 8) + 4 : 4);
+  const cy = (v: number) => CH - 6 - v * (CH - 12);
+  const fragPath = (r: Run) => (r.ok ? r.steps.slice(firstVisible).map((st, i) => `${i ? 'L' : 'M'}${cx(firstVisible + i)},${cy(st.frag?.ext_frag ?? 0)}`).join(' ') : '');
   const rows = [
     { key: 'total_free', label: 'Free units', better: 'high' },
     { key: 'largest_hole', label: 'Largest hole', better: 'high' },
@@ -142,6 +151,23 @@
       <button class="btn" onclick={undo} disabled={ops.length <= setupCount}><Icon name="undo" /> Undo</button>
       <button class="btn ghost" onclick={() => load(presetKey)}><Icon name="reset" /> Reset</button>
     </section>
+
+    {#if live.length}
+      <section>
+        <span class="label">Running processes</span>
+        <ul class="procs">
+          {#each live as p (p)}
+            {@const mine = (steps[at]?.blocks ?? []).filter((b) => b.pid === p)}
+            <li>
+              <span class="swatch" style:background={colorOf(p)}></span>
+              <span class="mono">{p}</span>
+              <span class="mono faint">{mine.length} {mine.length === 1 ? 'block' : 'blocks'} · {mine.reduce((a, b) => a + b.size, 0)} units</span>
+              <button class="btn ghost small" onclick={() => terminate(p)} disabled={cursor !== null}>Terminate</button>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
   </aside>
 
   <section class="stage">
@@ -202,6 +228,18 @@
             </tbody>
           </table>
           <p class="hint">External fragmentation = 1 − largest hole ÷ free units: the share of free memory a single request cannot use.</p>
+          <svg class="chart" viewBox="0 0 {CW} {CH}" role="img" aria-label="External fragmentation at every step">
+            <line class="grid" x1="0" x2={CW} y1={cy(0)} y2={cy(0)} /><line class="grid" x1="0" x2={CW} y1={cy(1)} y2={cy(1)} />
+            {#each policies as p, k}
+              {@const r = runs[p]}
+              {#if r?.ok}
+                <path class="frag" class:dim={policies.length > 1 && k > 0} stroke-dasharray={['', '6 4', '2 4'][k]} d={fragPath(r)} />
+                {#each r.steps.slice(firstVisible) as st, i}{#if st.events.some((e) => e.type === 'AllocationFailed')}<circle class="failpt" cx={cx(firstVisible + i)} cy={cy(st.frag?.ext_frag ?? 0)} r="4" />{/if}{/each}
+              {/if}
+            {/each}
+            <line class="cursor" x1={cx(at)} x2={cx(at)} y1="4" y2={CH - 4} />
+          </svg>
+          <p class="hint">Fragmentation after every step{policies.length > 1 ? ' (solid First, dashed Best, dotted Worst)' : ''}; red dots mark failed requests.</p>
         </article>
       </div>
     {:else}
@@ -357,6 +395,56 @@
   }
   td.bad {
     color: var(--bad);
+  }
+  .procs {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 4px;
+  }
+  .procs li {
+    display: grid;
+    grid-template-columns: 10px 28px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+  }
+  .swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+  }
+  .faint {
+    color: var(--faint);
+  }
+  .small {
+    height: 28px;
+    padding: 0 8px;
+    font-size: 13px;
+  }
+  .chart {
+    width: 100%;
+    height: auto;
+  }
+  .chart .grid {
+    stroke: var(--rule);
+  }
+  .frag {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 1.75;
+  }
+  .frag.dim {
+    stroke: var(--muted);
+    stroke-width: 1.25;
+  }
+  .failpt {
+    fill: var(--bad);
+  }
+  .cursor {
+    stroke: var(--accent);
+    stroke-width: 1.5;
   }
   .error,
   .loading {

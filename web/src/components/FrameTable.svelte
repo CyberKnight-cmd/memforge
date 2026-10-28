@@ -1,28 +1,33 @@
 <script lang="ts">
-  import type { Step } from '../lib/sim';
-  // The textbook frames x references table. Column j is the state after reference j.
-  let { steps, refs, frames, at }: { steps: Step[]; refs: number[]; frames: number; at: number } = $props();
+  import type { Step, Ref } from '../lib/sim';
+  // The textbook frames x references table. Column j is memory after reference j.
+  let {
+    steps,
+    refs,
+    frames,
+    at,
+    firstAccess,
+    colorOf,
+  }: { steps: Step[]; refs: Ref[]; frames: number; at: number; firstAccess: number; colorOf: (pid: string) => string } = $props();
 
-  // steps[0] is the initial state, steps[1] the spawn; reference j is step j + 2.
+  const multi = $derived(new Set(refs.map((r) => r.pid)).size > 1);
   const cols = $derived(
     refs.map((ref, j) => {
-      const st = steps[j + 2];
-      if (!st) return { ref, cells: [], fault: false, evicted: null as number | null, loadedFrame: -1, hitFrame: -1 };
-      const fault = st.events.find((e) => e.type === 'PageFault');
-      const ev = st.events.find((e) => e.type === 'PageEvicted')?.data;
-      const loaded = st.events.find((e) => e.type === 'PageLoaded')?.data;
-      const hit = st.events.find((e) => e.type === 'PageHit')?.data;
+      const st = steps[firstAccess + j];
+      const ev = (t: string) => st?.events.find((e) => e.type === t)?.data;
       return {
         ref,
-        cells: st.frames.map((f) => f.vpn),
-        fault: !!fault,
-        evicted: ev ? ev.vpn : null,
-        loadedFrame: loaded ? loaded.frame : -1,
-        hitFrame: hit ? hit.frame : -1,
+        cells: st ? st.frames : [],
+        fault: !!ev('PageFault'),
+        evicted: ev('PageEvicted') ?? null,
+        writeback: !!ev('PageWrittenBack'),
+        loadedFrame: ev('PageLoaded')?.frame ?? -1,
+        hitFrame: ev('PageHit')?.frame ?? -1,
+        violation: !!ev('AccessViolation'),
       };
     }),
   );
-  const current = $derived(at - 2);
+  const current = $derived(at - firstAccess);
   let scroller: HTMLDivElement;
   $effect(() => {
     const el = scroller?.querySelector<HTMLElement>(`[data-col="${current}"]`);
@@ -31,11 +36,16 @@
 </script>
 
 <div class="scroller" bind:this={scroller}>
-  <table>
+  <table class:multi>
     <thead>
       <tr>
         <th scope="row" class="side">reference</th>
-        {#each cols as c, j}<th scope="col" class="mono ref" class:now={j === current} class:future={j > current} data-col={j}>{c.ref}</th>{/each}
+        {#each cols as c, j}
+          <th scope="col" class="mono ref" class:now={j === current} class:future={j > current} data-col={j}>
+            {#if multi}<span class="pid" style:color={colorOf(c.ref.pid)}>{c.ref.pid}</span>{/if}
+            <span>{c.ref.vpn}</span>{#if c.ref.write}<span class="w" title="write">w</span>{/if}
+          </th>
+        {/each}
       </tr>
     </thead>
     <tbody>
@@ -43,10 +53,13 @@
         <tr>
           <th scope="row" class="side">frame {f}</th>
           {#each cols as c, j}
-            {@const v = c.cells[f]}
+            {@const cell = c.cells[f]}
             <td class="mono" class:now={j === current} class:future={j > current}
               class:loaded={j <= current && c.loadedFrame === f} class:hit={j <= current && c.hitFrame === f}>
-              {#if j <= current && v !== null && v !== undefined}<span class="v">{v}</span>{/if}
+              {#if j <= current && cell && cell.pid !== null}
+                <span class="v" style:color={multi ? colorOf(cell.pid) : undefined}>{multi ? `${cell.pid.replace('P', '')}:` : ''}{cell.vpn}</span>
+                {#if cell.dirty}<span class="dirty" title="modified (dirty)"></span>{/if}
+              {/if}
             </td>
           {/each}
         </tr>
@@ -55,7 +68,12 @@
         <th scope="row" class="side">fault</th>
         {#each cols as c, j}
           <td class="mono" class:now={j === current} class:future={j > current}>
-            {#if j <= current && c.fault}<span class="f" title={c.evicted !== null ? `evicted page ${c.evicted}` : 'loaded into a free frame'}>F</span>{#if c.evicted !== null}<span class="out">−{c.evicted}</span>{/if}{/if}
+            {#if j <= current && c.violation}<span class="f">rej</span>
+            {:else if j <= current && c.fault}
+              <span class="f">F</span>
+              {#if c.evicted}<span class="out">−{multi ? `${c.evicted.pid.replace('P', '')}:` : ''}{c.evicted.vpn}</span>{/if}
+              {#if c.writeback}<span class="wb" title="dirty victim written back to disk">WB</span>{/if}
+            {/if}
           </td>
         {/each}
       </tr>
@@ -86,29 +104,45 @@
     white-space: nowrap;
   }
   .ref {
-    width: 38px;
-    min-width: 38px;
-    height: 30px;
+    min-width: 40px;
+    height: 34px;
     color: var(--muted);
     font-weight: 600;
     border-bottom: 2px solid transparent;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+  .multi .ref {
+    min-width: 46px;
+  }
+  .ref .pid {
+    display: block;
+    font-size: 11px;
+  }
+  .ref .w {
+    color: var(--accent);
+    font-size: 12px;
   }
   .ref.now {
     color: var(--text);
     border-bottom-color: var(--accent);
   }
   td {
-    width: 38px;
-    height: 38px;
+    position: relative;
+    min-width: 40px;
+    height: 40px;
     text-align: center;
     border-radius: 6px;
     background: var(--ground);
     border: 1px solid var(--rule);
     transition: background 200ms var(--ease), opacity 200ms var(--ease);
   }
+  .multi td {
+    min-width: 46px;
+  }
   td.future,
   th.future {
-    opacity: 0.35;
+    opacity: 0.3;
   }
   td.now {
     border-color: var(--rule-strong);
@@ -116,6 +150,15 @@
   .v {
     display: inline-block;
     animation: drop 260ms var(--ease);
+  }
+  .dirty {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
   }
   td.loaded {
     background: color-mix(in srgb, var(--bad) 16%, var(--ground));
@@ -129,17 +172,26 @@
   .faults td {
     background: transparent;
     border-color: transparent;
-    height: 30px;
+    height: 44px;
+    vertical-align: top;
+    padding-top: 4px;
   }
   .f {
     color: var(--bad);
     font-weight: 700;
   }
-  .out {
+  .out,
+  .wb {
     display: block;
     font-size: 11px;
+    line-height: 1.2;
+  }
+  .out {
     color: var(--faint);
-    line-height: 1;
+  }
+  .wb {
+    color: var(--accent);
+    font-weight: 600;
   }
   @keyframes drop {
     from {

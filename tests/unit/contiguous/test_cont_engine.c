@@ -90,7 +90,7 @@ static void test_ac2_compact_then_retry(void) {
     ms_cont_engine_destroy(e);
 }
 
-/* Rejections leave the layout byte-identical. */
+/* Rejections leave the layout unchanged. */
 static void expect_unchanged(ms_cont_engine *e,
                              ms_cont_result (*op)(ms_cont_engine *, ms_pid, ms_alloc_id),
                              ms_pid pid, ms_alloc_id id, ms_cont_outcome want) {
@@ -101,7 +101,11 @@ static void expect_unchanged(ms_cont_engine *e,
     CHECK_EQ_INT(op(e, pid, id).outcome, want);
     b = ms_cont_engine_blocks(e, &n1);
     CHECK_EQ_INT(n1, n0);
-    CHECK(memcmp(before, b, n0 * sizeof *b) == 0);
+    for (size_t i = 0; i < n0; i++) { /* field by field: memcmp would read ms_block's padding */
+        CHECK(before[i].start == b[i].start && before[i].size == b[i].size &&
+              before[i].state == b[i].state && before[i].pid == b[i].pid &&
+              before[i].alloc_id == b[i].alloc_id && before[i].requested == b[i].requested);
+    }
     CHECK_EQ_INT(ms_cont_engine_check(e), 0);
 }
 

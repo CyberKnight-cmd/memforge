@@ -99,7 +99,8 @@ static void remove_at(ms_cont_model *m, size_t i) {
 
 void ms_cont_model_free_at(ms_cont_model *m, size_t i) {
     contract(i < m->count && m->blocks[i].state == MS_BLOCK_ALLOCATED);
-    int64_t start = m->blocks[i].start, size = m->blocks[i].size;
+    int64_t start = m->blocks[i].start;
+    int64_t size = m->blocks[i].size;
     m->blocks[i] = FREE_TEMPLATE;
     m->blocks[i].start = start;
     m->blocks[i].size = size;

@@ -19,7 +19,8 @@ typedef struct {
 } opt_ref;
 
 static int opt_ref_cmp(const void *pa, const void *pb) {
-    const opt_ref *a = pa, *b = pb;
+    const opt_ref *a = pa;
+    const opt_ref *b = pb;
     if (a->key.pid != b->key.pid) {
         return a->key.pid < b->key.pid ? -1 : 1;
     }
@@ -31,7 +32,11 @@ static int opt_ref_cmp(const void *pa, const void *pb) {
 
 static void *opt_create(uint32_t frames) {
     opt_state *s = calloc(1, sizeof *s);
-    if (s && !(s->next = calloc(frames ? frames : 1, sizeof *s->next))) {
+    if (s == NULL) {
+        return NULL;
+    }
+    s->next = calloc(frames ? frames : 1, sizeof *s->next);
+    if (s->next == NULL) {
         free(s);
         return NULL;
     }

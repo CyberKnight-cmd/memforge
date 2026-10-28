@@ -10,7 +10,10 @@ trap 'rm -rf "$obj"' EXIT
 
 includes=()
 for d in "$root"/src/*/include; do includes+=(-I "$d"); done
-flags=(--target=wasm32-wasip1 --sysroot="$sysroot" -std=c17 -O2 -DNDEBUG -D_GNU_SOURCE -Wall -Wextra)
+# Newer wasi-libc names the target wasm32-wasip1; older distributions (Ubuntu 24.04) ship wasm32-wasi.
+target=wasm32-wasip1
+[ -d "$sysroot/lib/wasm32-wasip1" ] || target=wasm32-wasi
+flags=(--target="$target" --sysroot="$sysroot" -std=c17 -O2 -DNDEBUG -D_GNU_SOURCE -Wall -Wextra)
 
 sources=("$root/web/wasm/memsim_web.c")
 while IFS= read -r f; do sources+=("$f"); done < <(find "$root/src" -name '*.c' -not -path '*/cli/*' | sort)

@@ -38,4 +38,3 @@ endforeach()
 if(NOT MEMSIM_VALGRIND)
   add_test(NAME cli_smoke COMMAND bash ${PROJECT_SOURCE_DIR}/scripts/smoke_cli.sh $<TARGET_FILE:memsim>)
 endif()
-

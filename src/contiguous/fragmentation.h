@@ -7,7 +7,6 @@
 #define MEMSIM_CONTIGUOUS_FRAGMENTATION_H_
 
 #include "memsim/common/types.h"
-#include "p4_core_types.h"
 
 /* Fractions are integer parts per million, so no float ever enters engine state. */
 #define MS_PPM 1000000

@@ -3,7 +3,7 @@
   import Tokens from '../components/Tokens.svelte';
   import Segmented from '../components/Segmented.svelte';
   import Icon from '../components/Icon.svelte';
-  import { run, pagingText, parseRefs, processesOf, narrate, REPLACEMENT, POLICY_LABEL, AC3_REFS, AC4_REFS, MULTI_REFS, VA_REFS, type Run } from '../lib/sim';
+  import { generateReferences, run, pagingText, parseRefs, processesOf, narrate, REPLACEMENT, POLICY_LABEL, AC3_REFS, AC4_REFS, MULTI_REFS, VA_REFS, type Run } from '../lib/sim';
   import { query } from '../lib/route';
 
   const presets = [
@@ -32,7 +32,23 @@
   const policies = $derived(mode === 'compare' ? [...REPLACEMENT] : [mode]);
   const offsetBits = $derived(Math.log2(pageSize));
 
+  // Random references from the refs-locality generator: a working set that drifts over time.
+  let gen = $state({ seed: 1, n: 60, pages: 12, workingSet: 4, shiftEvery: 20, pOut: 5, pWrite: 20 });
+  async function generate() {
+    const text = await generateReferences({ seed: gen.seed, n: gen.n, pages: gen.pages, workingSet: gen.workingSet, shiftEvery: gen.shiftEvery,
+      pOutPpm: gen.pOut * 10000, pWritePpm: gen.pWrite * 10000, frames, pageSize });
+    if (text === null) return;
+    refsText = text;
+    cursor = null;
+    playing = false;
+  }
+  function useE4() {
+    gen = { seed: gen.seed, n: 2000, pages: 32, workingSet: 6, shiftEvery: 200, pOut: 5, pWrite: 0 };
+    generate();
+  }
+
   function pick(key: string) {
+    if (key === 'random') return void generate();
     const p = presets.find((x) => x.key === key)!;
     refsText = p.refs;
     frames = p.frames;
@@ -152,7 +168,21 @@
       <label class="label" for="preset">Example</label>
       <select id="preset" class="field" bind:value={presetKey} onchange={() => pick(presetKey)}>
         {#each presets as p}<option value={p.key}>{p.label}</option>{/each}
+        <option value="random">Random references (generator)</option>
       </select>
+      {#if presetKey === 'random'}
+        <div class="gen">
+          <label><span class="label">Seed</span><input class="field mono" type="number" min="0" bind:value={gen.seed} /></label>
+          <label><span class="label">References</span><input class="field mono" type="number" min="1" max="2000" bind:value={gen.n} /></label>
+          <label><span class="label">Pages</span><input class="field mono" type="number" min="1" max="64" bind:value={gen.pages} /></label>
+          <label><span class="label">Working set</span><input class="field mono" type="number" min="1" bind:value={gen.workingSet} /></label>
+          <label><span class="label">Shift every</span><input class="field mono" type="number" min="1" bind:value={gen.shiftEvery} /></label>
+          <label><span class="label">Writes %</span><input class="field mono" type="number" min="0" max="100" bind:value={gen.pWrite} /></label>
+          <button class="btn primary" onclick={generate}>Generate</button>
+          <button class="btn" onclick={useE4}>E4 settings</button>
+          <p class="hint span">Most references fall in a working set of pages that moves every few references, with {gen.pOut}% outside it. “E4 settings” reproduces experiment E4's workload for this seed.</p>
+        </div>
+      {/if}
     </section>
     <section>
       <label class="label" for="refs">References</label>
@@ -331,6 +361,22 @@
     padding: 8px 10px;
     resize: vertical;
     line-height: 1.5;
+  }
+  .gen {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 6px;
+  }
+  .gen label {
+    display: grid;
+    gap: 6px;
+  }
+  .gen .span {
+    grid-column: span 2;
+  }
+  .gen .btn {
+    justify-content: center;
   }
   .two {
     display: grid;

@@ -5,7 +5,7 @@
   import Icon from '../components/Icon.svelte';
   import {
     run, contiguousText, narrate, PLACEMENT, POLICY_LABEL, SILBERSCHATZ_SETUP, SILBERSCHATZ_REQUESTS,
-    type ContOp, type Run, type Block,
+    generateContiguous, type ContOp, type Run, type Block,
   } from '../lib/sim';
   import { query } from '../lib/route';
 
@@ -28,7 +28,21 @@
   let runs = $state<Record<string, Run>>({});
   let cursor = $state<number | null>(null); // null: follow the latest step
 
+  // Random workloads from the alloc-uniform generator, with experiment E1's settings by default.
+  let gen = $state({ seed: 1, util: '900000', ops: 300 });
+  let genError = $state('');
+  async function generate() {
+    const g = await generateContiguous({ seed: gen.seed, ops: gen.ops, memorySize: 1024, sizeMin: 16, sizeMax: 128, pAllocPpm: 600000, targetUtilPpm: Number(gen.util) });
+    genError = g ? '' : 'The generator rejected these settings.';
+    if (!g) return;
+    memory = g.memory;
+    ops = g.ops;
+    setupCount = 0;
+    cursor = null;
+  }
+
   function load(key: string) {
+    if (key === 'random') return void generate();
     const p = presets.find((x) => x.key === key)!;
     memory = p.memory;
     ops = [...p.ops];
@@ -52,6 +66,10 @@
   const last = $derived(Math.max(0, steps.length - 1));
   const at = $derived(cursor === null ? last : Math.min(cursor, last));
   const firstVisible = $derived(Math.min(setupCount, last));
+  // Long generated workloads: render a window of the history around the current step.
+  const WIN = 80;
+  const winStart = $derived(Math.max(firstVisible + 1, Math.min(at - WIN / 2, steps.length - WIN)));
+  const winEnd = $derived(Math.min(steps.length, winStart + WIN));
 
   const palette = ['var(--p0)', 'var(--p1)', 'var(--p2)', 'var(--p3)', 'var(--p4)', 'var(--p5)'];
   const colorOf = (p: string) => (p === 'SYS' ? 'var(--sys)' : palette[(Number(p.replace(/\D/g, '')) || 0) % palette.length]);
@@ -119,7 +137,20 @@
       <label class="label" for="preset">Starting memory</label>
       <select id="preset" class="field" bind:value={presetKey} onchange={() => load(presetKey)}>
         {#each presets as p}<option value={p.key}>{p.label}</option>{/each}
+        <option value="random">Random workload (generator)</option>
       </select>
+      {#if presetKey === 'random'}
+        <div class="gen">
+          <label><span class="label">Seed</span><input class="field mono" type="number" min="0" bind:value={gen.seed} /></label>
+          <label><span class="label">Requests</span>
+            <select class="field mono" bind:value={gen.ops}>{#each [100, 300, 1000, 3000] as n}<option value={n}>{n}</option>{/each}</select></label>
+          <div class="span"><span class="label">Target utilisation</span>
+            <Segmented label="Target utilisation" bind:value={gen.util} options={[{ value: '600000', label: '60%' }, { value: '750000', label: '75%' }, { value: '900000', label: '90%' }]} /></div>
+          <button class="btn primary span" onclick={generate}>Generate</button>
+          <p class="hint span">1024 units, sizes 16 to 128, the generator holds memory near the target. 3000 requests with seeds 1 to 10 are exactly experiment E1's workloads.</p>
+          {#if genError}<p class="hint bad span">{genError}</p>{/if}
+        </div>
+      {/if}
     </section>
 
     <section>
@@ -198,10 +229,13 @@
               <li><button class:on={at === firstVisible} onclick={() => (cursor = firstVisible)}>
                 <span class="mono idx">0</span><span>Setup: {steps[firstVisible]?.blocks.filter((b) => b.state === 'free').length} holes prepared by SYS</span></button></li>
             {/if}
-            {#each steps.slice(firstVisible + 1) as st, i (st.step)}
-              <li><button class:on={at === firstVisible + 1 + i} onclick={() => (cursor = firstVisible + 1 + i === last ? null : firstVisible + 1 + i)}>
-                <span class="mono idx">{i + 1}</span><Tokens toks={narrate(st.events, policies[0])} {colorOf} /></button></li>
+            {#if winStart > firstVisible + 1}<li class="more">{winStart - firstVisible - 1} earlier steps · use ← or the chart</li>{/if}
+            {#each steps.slice(winStart, winEnd) as st, i (st.step)}
+              {@const k = winStart + i}
+              <li><button class:on={at === k} onclick={() => (cursor = k === last ? null : k)}>
+                <span class="mono idx">{k - firstVisible}</span><Tokens toks={narrate(st.events, policies[0])} {colorOf} /></button></li>
             {/each}
+            {#if winEnd < steps.length}<li class="more">{steps.length - winEnd} later steps</li>{/if}
           </ol>
           <p class="hint">Use ← and → to step through history. Acting from an earlier step discards the later ones.</p>
         </article>
@@ -228,7 +262,9 @@
             </tbody>
           </table>
           <p class="hint">External fragmentation = 1 − largest hole ÷ free units: the share of free memory a single request cannot use.</p>
-          <svg class="chart" viewBox="0 0 {CW} {CH}" role="img" aria-label="External fragmentation at every step">
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions (← and → step from the keyboard) -->
+          <svg class="chart" viewBox="0 0 {CW} {CH}" role="img" aria-label="External fragmentation at every step; click to jump"
+            onclick={(e) => { const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect(); const k = Math.round(firstVisible + ((e.clientX - r.left) / r.width) * (last - firstVisible)); cursor = k >= last ? null : Math.max(firstVisible, k); }}>
             <line class="grid" x1="0" x2={CW} y1={cy(0)} y2={cy(0)} /><line class="grid" x1="0" x2={CW} y1={cy(1)} y2={cy(1)} />
             {#each policies as p, k}
               {@const r = runs[p]}
@@ -395,6 +431,28 @@
   }
   td.bad {
     color: var(--bad);
+  }
+  .gen {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 6px;
+  }
+  .gen label,
+  .gen .span {
+    display: grid;
+    gap: 6px;
+  }
+  .gen .span {
+    grid-column: span 2;
+  }
+  .bad {
+    color: var(--bad);
+  }
+  .more {
+    padding: 6px 10px;
+    font-size: 13px;
+    color: var(--faint);
   }
   .procs {
     list-style: none;

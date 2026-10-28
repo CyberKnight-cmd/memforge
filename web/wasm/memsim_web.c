@@ -2,6 +2,7 @@
  * Each call is a full deterministic run through the same pipeline as `memsim run`, so the web
  * app can never disagree with the CLI. Owner: P1. */
 #include "memsim/bench.h"
+#include "memsim/workloads/generators.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,4 +53,47 @@ WEB_EXPORT("memsim_run") char *memsim_run(const char *text, size_t len, const ch
         }
     }
     return out;
+}
+
+/* The section 12 generators, so the web app can load exactly the workloads the experiments use.
+ * Return the workload text (caller frees), or NULL on invalid parameters. */
+static char *generated(ms_status (*gen)(const void *, FILE *), const void *params) {
+    char *out = NULL;
+    size_t len = 0;
+    FILE *f = open_memstream(&out, &len);
+    if (f == NULL) {
+        return NULL;
+    }
+    ms_status st = gen(params, f);
+    (void)fclose(f);
+    if (st != MS_OK) {
+        free(out);
+        return NULL;
+    }
+    return out;
+}
+
+static ms_status gen_alloc(const void *p, FILE *f) {
+    return ms_wl_gen_alloc_uniform(p, f);
+}
+
+static ms_status gen_refs(const void *p, FILE *f) {
+    return ms_wl_gen_refs_locality(p, f);
+}
+
+WEB_EXPORT("memsim_gen_alloc_uniform")
+char *memsim_gen_alloc_uniform(uint64_t seed, uint32_t ops, int64_t memory_size, int64_t size_min,
+                               int64_t size_max, uint32_t p_alloc_ppm, uint32_t target_util_ppm) {
+    ms_wl_alloc_uniform_params p = {seed,     ops,         memory_size,    size_min,
+                                    size_max, p_alloc_ppm, target_util_ppm};
+    return generated(gen_alloc, &p);
+}
+
+WEB_EXPORT("memsim_gen_refs_locality")
+char *memsim_gen_refs_locality(uint64_t seed, uint32_t n, uint32_t pages, uint32_t working_set,
+                               uint32_t shift_every, uint32_t p_out_ppm, uint32_t p_write_ppm,
+                               uint32_t frames, uint32_t page_size) {
+    ms_wl_refs_locality_params p = {seed,      n,           pages,  working_set, shift_every,
+                                    p_out_ppm, p_write_ppm, frames, page_size};
+    return generated(gen_refs, &p);
 }

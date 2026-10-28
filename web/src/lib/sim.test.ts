@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { describe, expect, it, beforeAll } from 'vitest';
-import { loadEngine, runSync } from './engine';
+import { loadEngine, runSync, genAllocUniform, genRefsLocality } from './engine';
 import { parseRefs, pagingText, toSteps, contiguousText, narrate, MULTI_REFS, VA_REFS, AC3_REFS, AC4_REFS, SILBERSCHATZ_SETUP, SILBERSCHATZ_REQUESTS, type Run } from './sim';
 
 const root = resolve(__dirname, '../../..');
@@ -87,5 +87,17 @@ describe('WebAssembly engine', () => {
       ],
       bad: ['x'],
     });
+  });
+
+  it.runIf(existsSync(cli))('generators in the browser write exactly what memsim gen writes', () => {
+    const a = { seed: 3, ops: 3000, memorySize: 1024, sizeMin: 16, sizeMax: 128, pAllocPpm: 600000, targetUtilPpm: 900000 };
+    execFileSync(cli, ['gen', 'alloc-uniform', '--seed', '3', '--ops', '3000', '--memory-size', '1024', '--size-min', '16', '--size-max', '128', '--p-alloc-ppm', '600000', '--target-util-ppm', '900000', '-o', '/tmp/memforge-gen-a.wl']);
+    const want = readFileSync('/tmp/memforge-gen-a.wl', 'utf8');
+    expect(genAllocUniform(ex, a)).toBe(want);
+    const r = { seed: 4, n: 2000, pages: 32, workingSet: 6, shiftEvery: 200, pOutPpm: 50000, pWritePpm: 0, frames: 16, pageSize: 4096 };
+    execFileSync(cli, ['gen', 'refs-locality', '--seed', '4', '--n', '2000', '--pages', '32', '--working-set', '6', '--shift-every', '200', '--p-out-ppm', '50000', '--p-write-ppm', '0', '--frames', '16', '--page-size', '4096', '-o', '/tmp/memforge-gen-r.wl']);
+    const wantR = readFileSync('/tmp/memforge-gen-r.wl', 'utf8');
+    expect(genRefsLocality(ex, r)).toBe(wantR);
+    expect(genAllocUniform(ex, { ...a, sizeMin: 0 })).toBeNull();
   });
 });

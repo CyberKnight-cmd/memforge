@@ -854,9 +854,12 @@ static void print_sweep_json(const char *policy, uint32_t min_f, uint32_t max_f,
     }
     printf("],\"belady_points\":[");
     bool first = true;
+    /* Report the frame count whose faults rose, as the text output marks it (library: the one
+     * before). */
     for (size_t i = 0; i < n_points; i++) {
-        if (points[i] >= min_f && points[i] <= max_f) {
-            printf("%s%" PRIu32, first ? "" : ",", points[i]);
+        uint32_t frames = points[i] + 1;
+        if (frames >= min_f && frames <= max_f) {
+            printf("%s%" PRIu32, first ? "" : ",", frames);
             first = false;
         }
     }
@@ -967,6 +970,10 @@ static bool parse_alloc_flag(const char *k, const char *v, ms_wl_alloc_uniform_p
     }
     if (strcmp(k, "--p-alloc-ppm") == 0) {
         p->p_alloc_ppm = (uint32_t)strtoul(v, NULL, 10);
+        return true;
+    }
+    if (strcmp(k, "--target-util-ppm") == 0) {
+        p->target_util_ppm = (uint32_t)strtoul(v, NULL, 10);
         return true;
     }
     return false;

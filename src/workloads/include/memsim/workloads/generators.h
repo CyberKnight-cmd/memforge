@@ -13,6 +13,7 @@ typedef struct {
     int64_t memory_size;
     int64_t size_min, size_max;
     uint32_t p_alloc_ppm;
+    uint32_t target_util_ppm; /* 0: off; else free whenever the emitted live units reach this share of memory */
 } ms_wl_alloc_uniform_params;
 
 typedef struct {

@@ -63,7 +63,7 @@ ms_status ms_wl_gen_alloc_uniform(const ms_wl_alloc_uniform_params *p, FILE *out
         return MS_ERR_INVALID;
     }
     if (p->ops == 0U || p->size_min <= 0 || p->size_min > p->size_max || p->memory_size <= 0 ||
-        p->p_alloc_ppm > 1000000U) {
+        p->p_alloc_ppm > 1000000U || p->target_util_ppm > 1000000U) {
         return MS_ERR_INVALID;
     }
 
@@ -74,14 +74,21 @@ ms_status ms_wl_gen_alloc_uniform(const ms_wl_alloc_uniform_params *p, FILE *out
         fprintf(out, "gen_ops %" PRIu32 "\n", p->ops) < 0 ||
         fprintf(out, "gen_size_min %" PRId64 "\n", p->size_min) < 0 ||
         fprintf(out, "gen_size_max %" PRId64 "\n", p->size_max) < 0 ||
-        fprintf(out, "gen_p_alloc_ppm %" PRIu32 "\n", p->p_alloc_ppm) < 0) {
+        fprintf(out, "gen_p_alloc_ppm %" PRIu32 "\n", p->p_alloc_ppm) < 0 ||
+        fprintf(out, "gen_target_util_ppm %" PRIu32 "\n", p->target_util_ppm) < 0) {
         return MS_ERR_INVALID;
     }
 
     uint32_t *live_blocks = malloc((size_t)p->ops * sizeof(uint32_t));
-    if (live_blocks == NULL) {
+    int64_t *live_sizes = malloc((size_t)p->ops * sizeof(int64_t));
+    if (live_blocks == NULL || live_sizes == NULL) {
+        free(live_blocks);
+        free(live_sizes);
         return MS_ERR_NOMEM;
     }
+    /* Emitted live units, not the engine's: a failed alloc still counts until it is freed. */
+    int64_t live_units = 0;
+    int64_t target_units = (int64_t)(((uint64_t)p->memory_size * p->target_util_ppm) / 1000000U);
 
     xoshiro256ss_rng rng;
     rng_seed(&rng, p->seed);
@@ -94,6 +101,8 @@ ms_status ms_wl_gen_alloc_uniform(const ms_wl_alloc_uniform_params *p, FILE *out
         bool do_alloc = false;
         if (live_count == 0) {
             do_alloc = true;
+        } else if (p->target_util_ppm > 0 && live_units >= target_units) {
+            do_alloc = false;
         } else {
             do_alloc = (rng_draw(&rng, 1000000ULL) < (uint64_t)p->p_alloc_ppm);
         }
@@ -105,12 +114,16 @@ ms_status ms_wl_gen_alloc_uniform(const ms_wl_alloc_uniform_params *p, FILE *out
                 status = MS_ERR_INVALID;
                 break;
             }
+            live_sizes[live_count] = sz;
             live_blocks[live_count++] = k;
+            live_units += sz;
             k++;
         } else {
             uint64_t idx = rng_draw(&rng, (uint64_t)live_count);
             uint32_t victim = live_blocks[idx];
+            live_units -= live_sizes[idx];
             live_blocks[idx] = live_blocks[live_count - 1];
+            live_sizes[idx] = live_sizes[live_count - 1];
             live_count--;
             if (fprintf(out, "free P%" PRIu32 " b%" PRIu32 "\n", victim % 4U, victim) < 0) {
                 status = MS_ERR_INVALID;
@@ -120,6 +133,7 @@ ms_status ms_wl_gen_alloc_uniform(const ms_wl_alloc_uniform_params *p, FILE *out
     }
 
     free(live_blocks);
+    free(live_sizes);
     return status;
 }
 

@@ -1,89 +1,133 @@
-<script>
-  import svelteLogo from './assets/svelte.svg'
-  import viteLogo from './assets/vite.svg'
-  import heroImg from './assets/hero.png'
-  import Counter from './lib/Counter.svelte'
+<script lang="ts">
+  import Home from './routes/Home.svelte';
+  import Contiguous from './routes/Contiguous.svelte';
+  import Paging from './routes/Paging.svelte';
+  import Icon from './components/Icon.svelte';
+
+  const routes = { '': Home, contiguous: Contiguous, paging: Paging } as const;
+  type Route = keyof typeof routes;
+  const current = () => (location.hash.replace(/^#\/?/, '') as Route) in routes ? (location.hash.replace(/^#\/?/, '') as Route) : '';
+  let route = $state<Route>(current());
+  $effect(() => {
+    const on = () => {
+      route = current();
+      window.scrollTo(0, 0);
+    };
+    addEventListener('hashchange', on);
+    return () => removeEventListener('hashchange', on);
+  });
+
+  let theme = $state(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+  function toggleTheme() {
+    theme = theme === 'light' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = theme;
+    try {
+      localStorage.setItem('memforge-theme', theme);
+    } catch {}
+  }
+  const Page = $derived(routes[route]);
 </script>
 
-<section id="center">
-  <div class="hero">
-    <img src={heroImg} class="base" width="170" height="179" alt="" />
-    <img src={svelteLogo} class="framework" alt="Svelte logo" />
-    <img src={viteLogo} class="vite" alt="Vite logo" />
-  </div>
-  <div>
-    <h1>Get started</h1>
-    <p>Edit <code>src/App.svelte</code> and save to test <code>HMR</code></p>
-  </div>
-  <Counter />
-</section>
+<header class="bar">
+  <a class="brand" href="#/" aria-label="MemForge home">
+    <span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>
+    MemForge
+  </a>
+  <nav aria-label="Main">
+    <a href="#/" aria-current={route === '' ? 'page' : undefined}>Overview</a>
+    <a href="#/contiguous" aria-current={route === 'contiguous' ? 'page' : undefined}>Contiguous memory</a>
+    <a href="#/paging" aria-current={route === 'paging' ? 'page' : undefined}>Paging</a>
+  </nav>
+  <button class="btn ghost icon" onclick={toggleTheme} aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}>
+    <Icon name={theme === 'light' ? 'moon' : 'sun'} />
+  </button>
+</header>
 
-<div class="ticks"></div>
+<main>
+  <Page />
+</main>
 
-<section id="next-steps">
-  <div id="docs">
-    <svg class="icon" role="presentation" aria-hidden="true">
-      <use href="/icons.svg#documentation-icon"></use>
-    </svg>
-    <h2>Documentation</h2>
-    <p>Your questions, answered</p>
-    <ul>
-      <li>
-        <a href="https://vite.dev/" target="_blank" rel="noreferrer">
-          <img class="logo" src={viteLogo} alt="" />
-          Explore Vite
-        </a>
-      </li>
-      <li>
-        <a href="https://svelte.dev/" target="_blank" rel="noreferrer">
-          <img class="button-icon" src={svelteLogo} alt="" />
-          Learn more
-        </a>
-      </li>
-    </ul>
-  </div>
-  <div id="social">
-    <svg class="icon" role="presentation" aria-hidden="true">
-      <use href="/icons.svg#social-icon"></use>
-    </svg>
-    <h2>Connect with us</h2>
-    <p>Join the Vite community</p>
-    <ul>
-      <li>
-        <a href="https://github.com/vitejs/vite" target="_blank" rel="noreferrer">
-          <svg class="button-icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#github-icon"></use>
-          </svg>
-          GitHub
-        </a>
-      </li>
-      <li>
-        <a href="https://chat.vite.dev/" target="_blank" rel="noreferrer">
-          <svg class="button-icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#discord-icon"></use>
-          </svg>
-          Discord
-        </a>
-      </li>
-      <li>
-        <a href="https://x.com/vite_js" target="_blank" rel="noreferrer">
-          <svg class="button-icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#x-icon"></use>
-          </svg>
-          X.com
-        </a>
-      </li>
-      <li>
-        <a href="https://bsky.app/profile/vite.dev" target="_blank" rel="noreferrer">
-          <svg class="button-icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#bluesky-icon"></use>
-          </svg>
-          Bluesky
-        </a>
-      </li>
-    </ul>
-  </div>
-</section>
-
-<div class="ticks"></div>
-<section id="spacer"></section>
+<style>
+  .bar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 32px;
+    height: 60px;
+    padding: 0 24px;
+    background: color-mix(in srgb, var(--ground) 88%, transparent);
+    backdrop-filter: saturate(1.4) blur(10px);
+    border-bottom: 1px solid var(--rule);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .mark {
+    display: flex;
+    gap: 2px;
+    height: 14px;
+  }
+  .mark i {
+    display: block;
+    border-radius: 2px;
+  }
+  .mark i:nth-child(1) {
+    width: 5px;
+    background: var(--accent);
+  }
+  .mark i:nth-child(2) {
+    width: 10px;
+    background: var(--p0);
+  }
+  .mark i:nth-child(3) {
+    width: 4px;
+    background: var(--p1);
+  }
+  nav {
+    display: flex;
+    gap: 4px;
+  }
+  nav a {
+    padding: 6px 12px;
+    border-radius: 6px;
+    color: var(--muted);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 160ms var(--ease), background 160ms var(--ease);
+  }
+  nav a:hover {
+    color: var(--text);
+  }
+  nav a[aria-current='page'] {
+    color: var(--text);
+    background: var(--raised);
+  }
+  .icon {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+  main {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+  }
+  @media (max-width: 760px) {
+    .bar {
+      grid-template-columns: auto auto;
+      gap: 12px;
+    }
+    nav {
+      display: none;
+    }
+  }
+</style>

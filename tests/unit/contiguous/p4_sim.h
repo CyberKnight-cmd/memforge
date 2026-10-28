@@ -6,7 +6,7 @@
 #ifndef MEMSIM_TESTS_UNIT_CONTIGUOUS_P4_SIM_H_
 #define MEMSIM_TESTS_UNIT_CONTIGUOUS_P4_SIM_H_
 
-#include "p4_core_types.h"
+#include "memsim/common/types.h"
 
 #include <string.h>
 

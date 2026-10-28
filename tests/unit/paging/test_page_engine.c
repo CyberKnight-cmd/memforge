@@ -168,11 +168,69 @@ static void test_terminate(void) {
     ms_page_engine_destroy(e);
 }
 
+static void test_frame_accessor(void) {
+    /* AC-3 FIFO: string 7 0 1 ... with 3 frames.
+       After the first 3 accesses, frames hold pages 7, 0, 1 with referenced true. */
+    const uint32_t refs[] = {7, 0, 1};
+    ms_op ops[4];
+    ops[0] = (ms_op){.kind = MS_OP_SPAWN, .u.spawn = {.pid = 0, .pages = 8}};
+    for (size_t i = 0; i < 3; i++) {
+        ops[i + 1] =
+            (ms_op){.kind = MS_OP_ACCESS,
+                    .u.access = {.pid = 0, .by_va = false, .vpn_or_va = refs[i], .write = false}};
+    }
+
+    ms_paging_config cfg = ms_paging_config_default();
+    cfg.page_size = 4096;
+    cfg.frames = 3;
+    cfg.policy = "fifo";
+
+    ms_page_engine *e = NULL;
+    CHECK_EQ_INT(ms_page_engine_create(&cfg, &e), MS_OK);
+    CHECK_EQ_INT(ms_page_engine_prepare(e, ops, 4), MS_OK);
+
+    ms_page_frame_info info[3];
+    CHECK_EQ_INT(ms_page_engine_frames(e, info, 3), 3);
+    for (size_t i = 0; i < 3; i++) {
+        CHECK_EQ_INT(info[i].pid, MS_NONE);
+    }
+
+    ms_page_step out = {0};
+    CHECK_EQ_INT(ms_page_engine_apply(e, &ops[0], &out), MS_OK);
+    for (size_t i = 1; i <= 3; i++) {
+        CHECK_EQ_INT(ms_page_engine_apply(e, &ops[i], &out), MS_OK);
+    }
+
+    CHECK_EQ_INT(ms_page_engine_frames(e, info, 3), 3);
+    CHECK_EQ_INT(info[0].pid, 0);
+    CHECK_EQ_INT(info[0].vpn, 7);
+    CHECK(info[0].referenced);
+    CHECK(!info[0].dirty);
+
+    CHECK_EQ_INT(info[1].pid, 0);
+    CHECK_EQ_INT(info[1].vpn, 0);
+    CHECK(info[1].referenced);
+    CHECK(!info[1].dirty);
+
+    CHECK_EQ_INT(info[2].pid, 0);
+    CHECK_EQ_INT(info[2].vpn, 1);
+    CHECK(info[2].referenced);
+    CHECK(!info[2].dirty);
+
+    ms_page_frame_info info2[2];
+    CHECK_EQ_INT(ms_page_engine_frames(e, info2, 2), 3);
+    CHECK_EQ_INT(info2[0].vpn, 7);
+    CHECK_EQ_INT(info2[1].vpn, 0);
+
+    ms_page_engine_destroy(e);
+}
+
 int main(void) {
     RUN_TEST(test_translation);
     RUN_TEST(test_ac3_fifo);
     RUN_TEST(test_dirty_and_writeback);
     RUN_TEST(test_violations);
     RUN_TEST(test_terminate);
+    RUN_TEST(test_frame_accessor);
     TEST_EXIT();
 }

@@ -7,7 +7,6 @@
 #define MEMSIM_CONTIGUOUS_COMPACTION_H_
 
 #include "memsim/common/types.h"
-#include "p4_core_types.h"
 
 typedef struct {
     ms_alloc_id alloc_id;

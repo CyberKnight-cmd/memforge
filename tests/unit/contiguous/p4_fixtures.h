@@ -2,7 +2,7 @@
 #ifndef MEMSIM_TESTS_UNIT_CONTIGUOUS_P4_FIXTURES_H_
 #define MEMSIM_TESTS_UNIT_CONTIGUOUS_P4_FIXTURES_H_
 
-#include "p4_core_types.h"
+#include "memsim/common/types.h"
 
 enum { PID_SYS = 0, PID_P1 = 1, PID_P2 = 2, PID_P3 = 3 };
 enum { ID_S1 = 10, ID_S2, ID_S3, ID_S4, ID_A1 = 21, ID_A2, ID_A3 };

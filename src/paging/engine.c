@@ -310,6 +310,37 @@ ms_page_stats ms_page_engine_stats(const ms_page_engine *e) {
     return e->stats;
 }
 
+size_t ms_page_engine_frames(const ms_page_engine *e, ms_page_frame_info *out, size_t cap) {
+    if (e == NULL) {
+        return 0;
+    }
+    size_t count = e->frames.n;
+    size_t to_write = count < cap ? count : cap;
+    if (out != NULL) {
+        for (size_t i = 0; i < to_write; i++) {
+            ms_page_key k = e->frames.owner[i];
+            if (k.pid == MS_NONE) {
+                out[i] = (ms_page_frame_info){
+                    .pid = MS_NONE,
+                    .vpn = 0,
+                    .referenced = false,
+                    .dirty = false,
+                };
+            } else {
+                const ms_page_table *pt = ms_page_tables_get(&e->tables, k.pid);
+                const ms_page_pte *p = (pt != NULL && k.vpn < pt->pages) ? &pt->ptes[k.vpn] : NULL;
+                out[i] = (ms_page_frame_info){
+                    .pid = k.pid,
+                    .vpn = k.vpn,
+                    .referenced = p != NULL && p->referenced,
+                    .dirty = p != NULL && p->dirty,
+                };
+            }
+        }
+    }
+    return count;
+}
+
 bool ms_page_engine_check(const ms_page_engine *e) {
     return ms_page_invariants_hold(&e->frames, &e->tables, &e->stats, e->pool_takes);
 }

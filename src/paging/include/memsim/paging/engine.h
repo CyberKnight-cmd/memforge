@@ -37,6 +37,15 @@ ms_status ms_page_engine_apply(ms_page_engine *e, const ms_op *op, ms_page_step 
 
 ms_page_stats ms_page_engine_stats(const ms_page_engine *e);
 
+typedef struct {
+    ms_pid pid;
+    uint32_t vpn;
+    bool referenced, dirty;
+} ms_page_frame_info; /* pid MS_NONE: free frame */
+
+/* Writes min(frames, cap) entries in frame order; returns the frame count. */
+size_t ms_page_engine_frames(const ms_page_engine *e, ms_page_frame_info *out, size_t cap);
+
 /* Paging invariants V1 to V5 (section 9); V6 is not checked. */
 bool ms_page_engine_check(const ms_page_engine *e);
 

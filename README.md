@@ -41,6 +41,19 @@ ctest --preset dev
 Warnings are errors in CI only. Locally, add `-DMEMSIM_WERROR=ON` to the configure step to see
 exactly what CI will reject.
 
+### Web app
+
+The labs at `web/` run the same C engine in the browser, compiled to WebAssembly. Extra
+requirements: Node 20+, `clang` with `wasm-ld`, and wasi-libc (`pacman -S wasi-libc
+wasi-compiler-rt`, or `apt install wasi-libc libclang-rt-18-dev-wasm32 lld` on Ubuntu).
+
+```sh
+bash scripts/build_wasm.sh    # writes web/public/memsim.wasm
+cd web && npm ci
+npm run dev                   # http://localhost:5173
+npm test                      # the WebAssembly build must match the CLI trace for trace
+```
+
 ## What it will do
 
 Once the engines land, the CLI covers the textbook exercises directly:
@@ -66,7 +79,7 @@ src/<module>/          one static library per module: exported headers in includ
   cli/                 the memsim command
 tests/                 unit tests per module, plus golden, property, oracle and integration tests
 benchmarks/specs/      committed benchmark specs
-viewer/                trace replay viewer
+web/                   web app: the C engine compiled to WebAssembly, with live labs
 third_party/           vendored libraries
 docs/                  architecture, conventions, research
 ```

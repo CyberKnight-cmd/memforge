@@ -83,11 +83,32 @@ jobs:
       - name: clang-tidy
         run: find src -name '*.c' -print0 | xargs -0 clang-tidy -p build/release --quiet
 
+  web:
+    name: Web app (WebAssembly engine)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang lld wasi-libc libclang-rt-18-dev-wasm32
+      - name: Build the WebAssembly engine
+        run: bash scripts/build_wasm.sh
+      - name: Build the native CLI (the web tests compare its traces with the WebAssembly build)
+        run: cmake --preset release && cmake --build --preset release
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install, typecheck, test and build the web app
+        working-directory: web
+        run: npm ci && npx svelte-check --tsconfig ./tsconfig.app.json --fail-on-warnings && npm test && npm run build
+
   # The one check branch protection requires, so the matrix can change without touching settings.
   ci-ok:
     name: CI passed
     if: always()
-    needs: [lint, build-test, valgrind, clang-tidy]
+    needs: [lint, build-test, valgrind, clang-tidy, web]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

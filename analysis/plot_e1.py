@@ -3,9 +3,9 @@
 
 Generates:
 1. Grouped bar chart of allocation success rate and fragmentation failure rate
-   per target and policy with mean and min-max error bars over seeds.
+   per target and policy with mean and 95% confidence-interval error bars over seeds.
 2. Grouped bar chart of scanned_mean (search cost) per target and policy
-   with mean and min-max error bars over seeds.
+   with mean and 95% confidence-interval error bars over seeds.
 
 Output formats: PDF and PNG in report/figures/.
 Academic style: white background, no titles inside figures, labelled axes with
@@ -17,6 +17,7 @@ import csv
 import os
 import sys
 
+from stats import summary  # noqa: E402  (analysis/ is on sys.path when run as a script)
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -91,13 +92,9 @@ def load_data(csv_path):
 def compute_stats(values):
     if not values:
         return 0.0, 0.0, 0.0
-    val_arr = np.array(values, dtype=float)
-    mean_val = float(np.mean(val_arr))
-    min_val = float(np.min(val_arr))
-    max_val = float(np.max(val_arr))
-    err_low = max(0.0, mean_val - min_val)
-    err_high = max(0.0, max_val - mean_val)
-    return mean_val, err_low, err_high
+    # Error bars are the 95% confidence interval of the mean over seeds (FR-W4).
+    _, mean_val, _, ci = summary([float(v) for v in values])
+    return mean_val, ci, ci
 
 
 def plot_e1(csv_path, output_dir):

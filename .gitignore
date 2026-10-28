@@ -8,3 +8,5 @@ compile_commands.json
 web/node_modules/
 web/dist/
 web/public/memsim.wasm
+__pycache__/
+/results/

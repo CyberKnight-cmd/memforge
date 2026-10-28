@@ -13,5 +13,6 @@ cd "$REPO_ROOT"
 # Generate report plots
 python3 analysis/plot_e1.py
 python3 analysis/plot_e4.py
+python3 analysis/summarize.py
 
 echo "[run_all] All experiments and report plots completed successfully."

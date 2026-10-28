@@ -49,9 +49,9 @@ POLICY_LABELS = {
 }
 
 TARGET_LABELS = {
-    "low": "Low",
-    "medium": "Medium",
-    "high": "High",
+    "low": "60% utilisation",
+    "medium": "75% utilisation",
+    "high": "90% utilisation",
 }
 
 TARGET_ORDER = ["low", "medium", "high"]

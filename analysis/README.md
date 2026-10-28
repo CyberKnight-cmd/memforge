@@ -35,7 +35,7 @@ Evaluates contiguous placement policies (`first-fit`, `best-fit`, `worst-fit`) u
 
 | Column | Type | Description |
 |---|---|---|
-| `target` | string | Memory utilisation target: `low` (sizes 8..64), `medium` (sizes 16..128), or `high` (sizes 32..256). |
+| `target` | string | Utilisation the generator holds memory at: `low` 60%, `medium` 75%, `high` 90% (sizes 16..128 throughout). |
 | `seed` | integer | Workload generator pseudo-random seed (1..10). |
 | `policy` | string | Placement policy evaluated (`first-fit`, `best-fit`, `worst-fit`). |
 | `alloc_requests` | integer | Total number of allocation requests attempted during the simulation. |

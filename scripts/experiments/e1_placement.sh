@@ -24,19 +24,11 @@ TARGETS=("low" "medium" "high")
 
 for target in "${TARGETS[@]}"; do
     echo "[E1] Target: $target"
+    # Section 13: hold emitted utilisation at 0.6, 0.75 or 0.9 of memory; sizes 16..128 throughout.
     case "$target" in
-        low)
-            size_min=8
-            size_max=64
-            ;;
-        medium)
-            size_min=16
-            size_max=128
-            ;;
-        high)
-            size_min=32
-            size_max=256
-            ;;
+        low) util_ppm=600000 ;;
+        medium) util_ppm=750000 ;;
+        high) util_ppm=900000 ;;
         *)
             echo "Unknown target: $target" >&2
             exit 1
@@ -50,9 +42,10 @@ for target in "${TARGETS[@]}"; do
             --seed "$seed" \
             --ops 3000 \
             --memory-size 1024 \
-            --size-min "$size_min" \
-            --size-max "$size_max" \
+            --size-min 16 \
+            --size-max 128 \
             --p-alloc-ppm 600000 \
+            --target-util-ppm "$util_ppm" \
             -o "$wl_file"
 
         json_output="$("$MEMSIM" compare "$wl_file" --policies first-fit,best-fit,worst-fit --json)"

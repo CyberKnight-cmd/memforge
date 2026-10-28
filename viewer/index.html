@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MemForge Trace Viewer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top bar 48px -->
+  <header class="top-bar" role="banner">
+    <div class="top-bar-left">
+      <span class="brand-title">MemForge</span>
+      <div class="divider-rule" aria-hidden="true"></div>
+      <span id="trace-name" class="trace-name mono"></span>
+      <div id="trace-meta-tags" class="trace-meta-tags">
+        <span id="meta-policy" class="meta-tag">policy</span>
+        <span id="meta-config" class="meta-tag"></span>
+      </div>
+    </div>
+
+    <div class="top-bar-right">
+      <input type="file" id="file-input" class="visually-hidden" accept=".jsonl,.trace,.json,.txt" aria-label="Open trace file">
+      <button type="button" id="btn-open-file" class="btn btn-top" aria-label="Open trace file">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5 C2 3.7 2.7 3 3.5 3 H6 L7.5 5 H12.5 C13.3 5 14 5.7 14 6.5 V11.5 C14 12.3 13.3 13 12.5 13 H3.5 C2.7 13 2 12.3 2 11.5 Z" /></svg>
+        <span>Open trace</span>
+      </button>
+
+      <select id="scenario-select" class="select-top" aria-label="Scenario">
+        <option value="" disabled selected>Scenario</option>
+        <option value="scenario-1">Placement: First, Best and Worst Fit</option>
+        <option value="scenario-2">Fragmentation and compaction</option>
+        <option value="scenario-3">Page replacement: FIFO, LRU and OPT</option>
+        <option value="scenario-4">Belady's anomaly</option>
+        <option value="open-trace">Open your own trace</option>
+      </select>
+
+      <button type="button" id="btn-theme-toggle" class="btn btn-top btn-icon" aria-label="Toggle theme">
+        <span id="theme-icon-slot">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3" /><line x1="8" y1="1.5" x2="8" y2="3" /><line x1="8" y1="13" x2="8" y2="14.5" /><line x1="1.5" y1="8" x2="3" y2="8" /><line x1="13" y1="8" x2="14.5" y2="8" /><line x1="3.4" y1="3.4" x2="4.5" y2="4.5" /><line x1="11.5" y1="11.5" x2="12.6" y2="12.6" /><line x1="3.4" y1="12.6" x2="4.5" y2="11.5" /><line x1="11.5" y1="4.5" x2="12.6" y2="3.4" /></svg>
+        </span>
+      </button>
+
+      <button type="button" id="btn-keyboard-help" class="btn btn-top btn-icon" aria-label="Keyboard shortcuts" aria-haspopup="dialog" aria-expanded="false">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3.5" width="12" height="9" rx="1.5" /><line x1="4.5" y1="6" x2="5.5" y2="6" /><line x1="7.5" y1="6" x2="8.5" y2="6" /><line x1="10.5" y1="6" x2="11.5" y2="6" /><line x1="5.5" y1="9" x2="10.5" y2="9" /></svg>
+      </button>
+
+      <!-- Keyboard Help Popover -->
+      <div id="keyboard-popover" class="popover keyboard-popover" role="dialog" aria-label="Keyboard shortcuts" hidden>
+        <div class="popover-title">Keyboard shortcuts</div>
+        <div class="shortcut-list">
+          <div class="shortcut-row"><span class="shortcut-key mono">Space</span><span class="shortcut-desc">Play / pause</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">&larr; / &rarr;</span><span class="shortcut-desc">Step back / step forward</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">Home / End</span><span class="shortcut-desc">Skip to start / skip to end</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">1-9</span><span class="shortcut-desc">Jump to chapter N</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">N / Shift+N</span><span class="shortcut-desc">Next / previous chapter</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">T</span><span class="shortcut-desc">Toggle dark / light theme</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">?</span><span class="shortcut-desc">Show / hide this help</span></div>
+          <div class="shortcut-row"><span class="shortcut-key mono">Esc</span><span class="shortcut-desc">Close popovers</span></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Viewport Area -->
+  <main class="main-viewport" role="main">
+
+    <!-- Empty State (when no trace loaded) -->
+    <div id="empty-state" class="empty-state">
+      <div class="empty-card">
+        <h1 class="empty-heading">Open a MemForge trace</h1>
+        <p class="empty-description">Drop a .jsonl file produced by memsim, or select a demo scenario.</p>
+        <button type="button" id="btn-empty-open" class="btn btn-primary" aria-label="Open trace">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5 C2 3.7 2.7 3 3.5 3 H6 L7.5 5 H12.5 C13.3 5 14 5.7 14 6.5 V11.5 C14 12.3 13.3 13 12.5 13 H3.5 C2.7 13 2 12.3 2 11.5 Z" /></svg>
+          <span>Open trace</span>
+        </button>
+
+        <div class="sample-list" aria-label="Demo Scenarios">
+          <button type="button" class="btn-sample-card" data-scenario="scenario-1">
+            <span class="sample-title mono">Placement: First, Best and Worst Fit</span>
+            <span class="sample-desc">Three placement policies stacked side-by-side on identical allocation requests</span>
+          </button>
+          <button type="button" class="btn-sample-card" data-scenario="scenario-2">
+            <span class="sample-title mono">Fragmentation and compaction</span>
+            <span class="sample-desc">Sliding compaction resolving external fragmentation to satisfy a blocked request</span>
+          </button>
+          <button type="button" class="btn-sample-card" data-scenario="scenario-3">
+            <span class="sample-title mono">Page replacement: FIFO, LRU and OPT</span>
+            <span class="sample-desc">Textbook replacement matrix and fault metrics compared across policies</span>
+          </button>
+          <button type="button" class="btn-sample-card" data-scenario="scenario-4">
+            <span class="sample-title mono">Belady's anomaly</span>
+            <span class="sample-desc">More physical frames causing more page faults under FIFO replacement</span>
+          </button>
+        </div>
+
+        <div id="load-error-message" class="load-error mono" hidden role="alert"></div>
+      </div>
+    </div>
+
+    <!-- Active Dashboard Grid (2fr / 1fr) -->
+    <div id="dashboard-grid" class="dashboard-grid" hidden>
+
+      <!-- Left Column: Memory / Frames -->
+      <section class="panel panel-left" aria-labelledby="heading-memory-panel">
+        <div class="panel-header">
+          <h2 id="heading-memory-panel" class="panel-heading">Memory</h2>
+        </div>
+
+        <!-- Replacement View Policy Tabs -->
+        <div id="replacement-tabs" class="replacement-tabs" role="tablist" aria-label="Page replacement policy" hidden>
+          <button type="button" role="tab" id="tab-fifo" class="btn-tab active" aria-selected="true" aria-controls="paging-viewport" tabindex="0">FIFO 15 faults</button>
+          <button type="button" role="tab" id="tab-lru" class="btn-tab" aria-selected="false" aria-controls="paging-viewport" tabindex="-1">LRU 12 faults</button>
+          <button type="button" role="tab" id="tab-opt" class="btn-tab" aria-selected="false" aria-controls="paging-viewport" tabindex="-1">OPT 9 faults</button>
+        </div>
+
+        <!-- Contiguous Visualization Viewport -->
+        <div id="contiguous-viewport" class="contiguous-viewport">
+          <div class="memory-stage">
+            <div id="ghost-host" class="ghost-host" aria-hidden="true"></div>
+            <div id="memory-strip" class="memory-strip" role="region" aria-label="Contiguous memory layout"></div>
+            <div id="address-ruler" class="address-ruler" aria-hidden="true"></div>
+            <div id="failure-bracket" class="failure-bracket" hidden aria-hidden="true"></div>
+          </div>
+        </div>
+
+        <!-- Compare Visualization Viewport (Three policies stacked) -->
+        <div id="compare-viewport" class="compare-viewport" hidden>
+          <div class="compare-strip-group">
+            <div class="compare-strip-header">
+              <span class="compare-policy mono">First-Fit</span>
+              <span id="compare-outcome-0" class="compare-outcome mono">ready</span>
+            </div>
+            <div class="memory-stage compare-stage">
+              <div id="compare-ghost-0" class="ghost-host" aria-hidden="true"></div>
+              <div id="compare-strip-0" class="memory-strip compare-strip" role="region" aria-label="First-Fit memory strip"></div>
+              <div id="compare-bracket-0" class="failure-bracket" hidden aria-hidden="true"></div>
+            </div>
+          </div>
+
+          <div class="compare-strip-group">
+            <div class="compare-strip-header">
+              <span class="compare-policy mono">Best-Fit</span>
+              <span id="compare-outcome-1" class="compare-outcome mono">ready</span>
+            </div>
+            <div class="memory-stage compare-stage">
+              <div id="compare-ghost-1" class="ghost-host" aria-hidden="true"></div>
+              <div id="compare-strip-1" class="memory-strip compare-strip" role="region" aria-label="Best-Fit memory strip"></div>
+              <div id="compare-bracket-1" class="failure-bracket" hidden aria-hidden="true"></div>
+            </div>
+          </div>
+
+          <div class="compare-strip-group">
+            <div class="compare-strip-header">
+              <span class="compare-policy mono">Worst-Fit</span>
+              <span id="compare-outcome-2" class="compare-outcome mono">ready</span>
+            </div>
+            <div class="memory-stage compare-stage">
+              <div id="compare-ghost-2" class="ghost-host" aria-hidden="true"></div>
+              <div id="compare-strip-2" class="memory-strip compare-strip" role="region" aria-label="Worst-Fit memory strip"></div>
+              <div id="compare-address-ruler" class="address-ruler" aria-hidden="true"></div>
+              <div id="compare-bracket-2" class="failure-bracket" hidden aria-hidden="true"></div>
+            </div>
+          </div>
+
+          <div class="compare-bottom">
+            <div id="compare-narrations" class="compare-narrations" aria-live="polite"></div>
+            <div class="compare-table-wrapper">
+              <table class="compare-table mono" id="compare-table">
+                <thead>
+                  <tr>
+                    <th class="compare-th-metric">Metric</th>
+                    <th class="compare-th-col">First-Fit</th>
+                    <th class="compare-th-col">Best-Fit</th>
+                    <th class="compare-th-col">Worst-Fit</th>
+                  </tr>
+                </thead>
+                <tbody id="compare-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Paging Visualization Viewport (Textbook Table) -->
+        <div id="paging-viewport" class="paging-viewport" hidden>
+          <div id="paging-table-wrapper" class="paging-table-wrapper" role="region" aria-label="Frame replacement table">
+            <table id="paging-table" class="paging-table">
+              <thead id="paging-thead"></thead>
+              <tbody id="paging-tbody"></tbody>
+              <tfoot id="paging-tfoot"></tfoot>
+            </table>
+          </div>
+        </div>
+
+        <!-- Step Narration Sentence -->
+        <div class="narration-wrapper">
+          <p id="narration-text" class="narration-text" aria-live="polite"></p>
+        </div>
+
+        <!-- Block Detail Popover -->
+        <div id="block-popover" class="popover block-popover" hidden role="tooltip">
+          <div class="block-popover-grid">
+            <span class="popover-label">ID</span>
+            <span id="popover-id" class="popover-value mono"></span>
+            <span class="popover-label">PID</span>
+            <span id="popover-pid" class="popover-value mono"></span>
+            <span class="popover-label">Start</span>
+            <span id="popover-start" class="popover-value mono"></span>
+            <span class="popover-label">Size</span>
+            <span id="popover-size" class="popover-value mono"></span>
+            <span class="popover-label">End</span>
+            <span id="popover-end" class="popover-value mono"></span>
+            <span class="popover-label">State</span>
+            <span id="popover-state" class="popover-value mono"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Stacked Panels -->
+      <div class="right-column">
+
+        <!-- Panel 1: Fragmentation / Faults -->
+        <section class="panel panel-metrics" aria-labelledby="heading-metrics-panel">
+          <div class="panel-header">
+            <h2 id="heading-metrics-panel" class="panel-heading">Fragmentation</h2>
+          </div>
+          <div class="metrics-table-wrapper">
+            <table class="metrics-table" id="metrics-table">
+              <tbody id="metrics-tbody"></tbody>
+            </table>
+          </div>
+          <div class="step-chart-container" id="step-chart-container">
+            <svg id="step-chart-svg" class="step-chart-svg" viewBox="0 0 360 120" preserveAspectRatio="none" aria-label="Step timeline chart" role="img"></svg>
+          </div>
+        </section>
+
+        <!-- Panel 2: Events -->
+        <section class="panel panel-events" aria-labelledby="heading-events-panel">
+          <div class="panel-header">
+            <h2 id="heading-events-panel" class="panel-heading">Events</h2>
+          </div>
+          <div id="events-list" class="events-list" role="log" aria-label="Step events log"></div>
+        </section>
+
+      </div>
+
+    </div>
+
+    <!-- Belady Anomaly Grid (3/5 chart / 2/5 textbook tables) -->
+    <div id="belady-grid" class="belady-grid" hidden>
+      <section class="panel panel-belady-chart" aria-labelledby="heading-belady-chart">
+        <div class="panel-header">
+          <h2 id="heading-belady-chart" class="panel-heading">Belady's Anomaly Sweep (1–6 frames)</h2>
+        </div>
+        <div class="belady-chart-wrapper">
+          <svg id="belady-chart-svg" class="belady-chart-svg" viewBox="0 0 540 340" aria-label="Belady anomaly fault sweep" role="img"></svg>
+        </div>
+      </section>
+
+      <section class="panel panel-belady-tables" aria-labelledby="heading-belady-tables">
+        <div class="panel-header">
+          <h2 id="heading-belady-tables" class="panel-heading">FIFO Replay Comparison</h2>
+        </div>
+        <div class="belady-tables-scroll">
+          <div class="belady-table-group">
+            <div class="belady-table-title mono" id="belady-title-f3">FIFO · 3 frames · 9 faults</div>
+            <div id="belady-f3-table-wrapper" class="paging-table-wrapper belady-subtable" role="region" aria-label="FIFO 3 frames replacement table">
+              <table class="paging-table" id="belady-f3-table">
+                <thead id="belady-f3-thead"></thead>
+                <tbody id="belady-f3-tbody"></tbody>
+                <tfoot id="belady-f3-tfoot"></tfoot>
+              </table>
+            </div>
+          </div>
+          <div class="belady-table-group">
+            <div class="belady-table-title mono" id="belady-title-f4">FIFO · 4 frames · 10 faults</div>
+            <div id="belady-f4-table-wrapper" class="paging-table-wrapper belady-subtable" role="region" aria-label="FIFO 4 frames replacement table">
+              <table class="paging-table" id="belady-f4-table">
+                <thead id="belady-f4-thead"></thead>
+                <tbody id="belady-f4-tbody"></tbody>
+                <tfoot id="belady-f4-tfoot"></tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+  </main>
+
+  <!-- Transport Bar (Fixed bottom 56px) -->
+  <footer class="transport-bar" role="toolbar" aria-label="Playback controls">
+    <div class="transport-nav">
+      <button type="button" id="btn-skip-start" class="btn btn-transport" aria-label="Skip to start" title="Skip to start (Home)">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3.5" y1="3.5" x2="3.5" y2="12.5" /><polyline points="12.5,3.5 7.5,8 12.5,12.5" /></svg>
+      </button>
+      <button type="button" id="btn-step-back" class="btn btn-transport" aria-label="Step back" title="Step back (Left arrow)">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="10,3.5 5,8 10,12.5" /></svg>
+      </button>
+      <button type="button" id="btn-play-pause" class="btn btn-play" aria-label="Play" title="Play / pause (Space)">
+        <span id="play-icon-slot">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M5 3.5 L12 8 L5 12.5 Z" /></svg>
+        </span>
+      </button>
+      <button type="button" id="btn-step-forward" class="btn btn-transport" aria-label="Step forward" title="Step forward (Right arrow)">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6,3.5 11,8 6,12.5" /></svg>
+      </button>
+      <button type="button" id="btn-skip-end" class="btn btn-transport" aria-label="Skip to end" title="Skip to end (End)">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12.5" y1="3.5" x2="12.5" y2="12.5" /><polyline points="3.5,3.5 8.5,8 3.5,12.5" /></svg>
+      </button>
+    </div>
+
+    <div class="step-counter mono" id="step-counter" aria-label="Current step">0 / 0</div>
+
+    <div class="scrubber-area">
+      <div id="chapters-container" class="chapters-container" aria-label="Chapters"></div>
+      <div class="scrubber-wrapper">
+        <div id="scrubber-ticks" class="scrubber-ticks" aria-hidden="true"></div>
+        <input type="range" id="scrubber-range" class="scrubber-range" min="0" max="0" value="0" aria-label="Timeline scrubber">
+      </div>
+    </div>
+
+    <div class="speed-control">
+      <select id="speed-select" class="select-transport mono" aria-label="Playback speed">
+        <option value="2400">0.5x</option>
+        <option value="1200" selected>1x</option>
+        <option value="600">2x</option>
+        <option value="300">4x</option>
+      </select>
+    </div>
+  </footer>
+
+  <script src="scenarios-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

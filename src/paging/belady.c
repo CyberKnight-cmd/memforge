@@ -10,10 +10,23 @@
  * shortcut: drives the policy through this built-in frame table with a NULL frame view (FIFO, LRU
  * and OPT never read it) because PagingEngine is still a stub; switch to P5's engine when it
  * merges. */
+/* All frames are full: ask the policy for a victim and tell it the old page leaves. */
+static uint32_t evict(const ms_page_replacement_policy *p, void *state, const ms_page_key *owner,
+                      uint32_t *candidates, uint32_t frames, uint64_t t) {
+    for (uint32_t i = 0; i < frames; i++) {
+        candidates[i] = i;
+    }
+    uint32_t f = p->choose_victim(state, NULL, candidates, frames, t);
+    if (p->on_evict) {
+        p->on_evict(state, f, owner[f]);
+    }
+    return f;
+}
+
 static bool run(const ms_page_replacement_policy *p, const ms_page_key *refs, size_t n,
                 uint32_t frames, uint64_t *faults) {
     void *state = p->create(frames);
-    ms_page_key *owner = malloc(frames * sizeof *owner);
+    ms_page_key *owner = calloc(frames, sizeof *owner);
     uint32_t *candidates = malloc(frames * sizeof *candidates);
     bool ok = state && owner && candidates && (!p->prepare || p->prepare(state, refs, n));
     uint32_t used = 0;
@@ -28,13 +41,7 @@ static bool run(const ms_page_replacement_policy *p, const ms_page_key *refs, si
             if (used < frames) {
                 used++;
             } else {
-                for (uint32_t i = 0; i < frames; i++) {
-                    candidates[i] = i;
-                }
-                f = p->choose_victim(state, NULL, candidates, frames, t);
-                if (p->on_evict) {
-                    p->on_evict(state, f, owner[f]);
-                }
+                f = evict(p, state, owner, candidates, frames, t);
             }
             owner[f] = refs[t];
             if (p->on_load) {

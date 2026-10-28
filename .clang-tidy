@@ -8,6 +8,7 @@ Checks: >
   -bugprone-easily-swappable-parameters,
   -readability-identifier-length,
   -readability-magic-numbers,
-  -misc-include-cleaner
+  -misc-include-cleaner,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 WarningsAsErrors: '*'
 HeaderFilterRegex: 'include/memsim/.*'

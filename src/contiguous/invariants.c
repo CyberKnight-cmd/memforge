@@ -1,33 +1,48 @@
 /* Contiguous invariants. Owner: P2. */
 #include "invariants.h"
 
+/* I1 to I6 for block i, which should start at `at`; 0 if they hold. */
+static int check_block(const ms_cont_model *m, size_t i, int64_t at) {
+    const ms_block *b = &m->blocks[i];
+    if (b->start != at) {
+        return 1;
+    }
+    if (b->size <= 0) {
+        return 2;
+    }
+    if (b->state == MS_BLOCK_FREE && i > 0 && m->blocks[i - 1].state == MS_BLOCK_FREE) {
+        return 3;
+    }
+    bool owned = b->pid != MS_NONE && b->alloc_id != MS_NONE;
+    bool unowned = b->pid == MS_NONE && b->alloc_id == MS_NONE;
+    if (b->state == MS_BLOCK_ALLOCATED ? !owned : !unowned) {
+        return 4;
+    }
+    if (b->state == MS_BLOCK_ALLOCATED) {
+        /* alignment and min_split are 1, so granted == requested */
+        if (b->requested != b->size) {
+            return 6;
+        }
+        if (ms_cont_model_id_state(m, b->alloc_id) != MS_CONT_ID_LIVE) {
+            return 5;
+        }
+    }
+    return 0;
+}
+
 int ms_cont_check_invariants(const ms_cont_model *m) {
-    int64_t at = 0, used = 0, free_units = 0;
-    size_t allocated = 0, live_ids = 0;
+    int64_t at = 0;
+    int64_t used = 0;
+    int64_t free_units = 0;
+    size_t allocated = 0;
+    size_t live_ids = 0;
     for (size_t i = 0; i < m->count; i++) {
         const ms_block *b = &m->blocks[i];
-        if (b->start != at) {
-            return 1;
-        }
-        if (b->size <= 0) {
-            return 2;
-        }
-        if (b->state == MS_BLOCK_FREE && i > 0 && m->blocks[i - 1].state == MS_BLOCK_FREE) {
-            return 3;
-        }
-        bool owned = b->pid != MS_NONE && b->alloc_id != MS_NONE;
-        bool unowned = b->pid == MS_NONE && b->alloc_id == MS_NONE;
-        if (b->state == MS_BLOCK_ALLOCATED ? !owned : !unowned) {
-            return 4;
+        int broken = check_block(m, i, at);
+        if (broken != 0) {
+            return broken;
         }
         if (b->state == MS_BLOCK_ALLOCATED) {
-            /* alignment and min_split are 1, so granted == requested */
-            if (b->requested != b->size) {
-                return 6;
-            }
-            if (ms_cont_model_id_state(m, b->alloc_id) != MS_CONT_ID_LIVE) {
-                return 5;
-            }
             used += b->size;
             allocated++;
         } else {

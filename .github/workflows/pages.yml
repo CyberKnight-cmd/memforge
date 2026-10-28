@@ -33,7 +33,7 @@ jobs:
       - name: Build the app
         working-directory: web
         env:
-          BASE_PATH: /${{ github.event.repository.name }}/
+          BASE_PATH: /  # served at the root of memforge.aryagupta-dev.xyz
         run: npm ci && npm run build
       - uses: actions/upload-pages-artifact@v4
         with:

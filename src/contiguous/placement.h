@@ -23,30 +23,22 @@ typedef struct {
     size_t scanned;
 } ms_cont_placement_decision;
 
-typedef ms_cont_placement_decision (*ms_cont_choose_fn)(
-    const ms_cont_placement_view *view,
-    int64_t requested_size
-);
+typedef ms_cont_placement_decision (*ms_cont_choose_fn)(const ms_cont_placement_view *view,
+                                                        int64_t requested_size);
 
 typedef struct {
     const char *name;
     ms_cont_choose_fn choose;
 } ms_cont_placement_policy;
 
-ms_cont_placement_decision ms_cont_first_fit_choose(
-    const ms_cont_placement_view *view,
-    int64_t requested_size
-);
+ms_cont_placement_decision ms_cont_first_fit_choose(const ms_cont_placement_view *view,
+                                                    int64_t requested_size);
 
-ms_cont_placement_decision ms_cont_best_fit_choose(
-    const ms_cont_placement_view *view,
-    int64_t requested_size
-);
+ms_cont_placement_decision ms_cont_best_fit_choose(const ms_cont_placement_view *view,
+                                                   int64_t requested_size);
 
-ms_cont_placement_decision ms_cont_worst_fit_choose(
-    const ms_cont_placement_view *view,
-    int64_t requested_size
-);
+ms_cont_placement_decision ms_cont_worst_fit_choose(const ms_cont_placement_view *view,
+                                                    int64_t requested_size);
 
 extern const ms_cont_placement_policy ms_cont_first_fit_policy;
 extern const ms_cont_placement_policy ms_cont_best_fit_policy;

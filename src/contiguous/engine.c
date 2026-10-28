@@ -362,6 +362,7 @@ ms_cont_result ms_cont_engine_compact(ms_cont_engine *e) {
                     },
             });
 
+    contract(m->count > 0); /* the model always holds at least one block */
     ms_cont_move *moves = malloc(m->count * sizeof *moves);
     contract(moves != NULL);
     size_t n = ms_cont_compaction_plan_sliding(m->blocks, m->count, moves);

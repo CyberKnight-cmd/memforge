@@ -9,7 +9,7 @@ import figures as F  # noqa: E402
 
 HERE = Path(__file__).parent
 ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV",
-         "XVI", "XVII", "XVIII", "XIX", "XX", "XXI", "XXII", "XXIII", "XXIV", "XXV"]
+         "XVI", "XVII", "XVIII", "XIX", "XX", "XXI", "XXII", "XXIII", "XXIV", "XXV", "XXVI", "XXVII", "XXVIII", "XXIX", "XXX", "XXXI", "XXXII", "XXXIII", "XXXIV", "XXXV"]
 
 TEAM = [("Adrija Das", "12024002001001", 51), ("Meghna Dhar", "12024002001045", 52),
         ("Arpita Goswami", "12024002001021", 53), ("Ankita Dhara", "12024002001263", 54),
@@ -101,6 +101,21 @@ while First-Fit scans the fewest holes (3.21 vs. 5.24 per request). On 2,000-ref
 faults follow OPT &lt; LRU &lt; FIFO at every frame count (103.2, 138.9 and 253.1 at 8 frames), and a
 frame sweep reproduces Belady's anomaly (9 &rarr; 10 faults). All eight acceptance criteria and 17
 test suites pass under AddressSanitizer, UBSan and Valgrind.</p>
+<p class="abs">The motivation is educational and experimental. Memory-management policies are usually
+taught with a handful of hand-worked examples, which show <i>how</i> a policy works but not <i>how well</i>
+it works when thousands of requests interact. MemForge lets a student replay the textbook examples step
+by step and then scale the same policies to large, seeded workloads, while guaranteeing that every number
+can be regenerated exactly on any machine.</p>
+<p class="abs">The simulator is organised as nine small C libraries with strictly one-way dependencies.
+A shared kernel defines types, events and errors; two engines own the contiguous and paged state; policies
+are interchangeable tables of function pointers; and a single <i>Session</i> facade applies each operation,
+checks structural invariants after every step and streams events to a JSON-Lines trace writer and a metrics
+collector. A native command-line tool (<code>memsim</code>) drives experiments, and a Svelte web laboratory
+runs the identical engine in the browser.</p>
+<p class="abs">Correctness is established independently of the results: textbook scenarios with
+hand-derived answers, invariants on every step, randomised oracles, byte-for-byte determinism checks and
+memory-safety tooling. The report closes with lessons learned and future work on Next-Fit, buddy
+allocation, Clock replacement and TLB modelling.</p>
 <p class="abs"><b><i>Keywords</i>&mdash;</b>memory management, deterministic simulation, contiguous
 allocation, fragmentation, demand paging, page replacement, Belady's anomaly.</p>""")
 
@@ -127,6 +142,20 @@ testing, interfaces and engineering.</p>""")
     a(fig(d.svg(), "The three design pillars of MemForge."))
 
     # ---------------------------------------------------------- 2
+    a(sub("A", "Contributions"))
+    a("""<ol class="tight"><li>A deterministic, event-driven simulation core in which policies never mutate state.</li>
+<li>Exact reproduction of the Silberschatz and Belady textbook examples (AC-1 to AC-4).</li>
+<li>Two seeded experiments (E1, E4) with 95% confidence intervals.</li>
+<li>One code base for the native CLI and the WebAssembly lab, proven equivalent trace-for-trace.</li></ol>""")
+    a(sub("B", "Organisation of the Report"))
+    d = F.D(340, 64)
+    for i, (t, s_) in enumerate([("Background", "Sec. 2-3"), ("Design", "Sec. 4-6"), ("Contiguous", "Sec. 7-9"),
+                                 ("Paging", "Sec. 10-13"), ("Evaluation", "Sec. 14-17"), ("Engineering", "Sec. 18-23")]):
+        x = 4 + i * 56
+        d.box(x, 14, 50, 32, [t, s_], 6.8, bold_first=True)
+        if i:
+            d.arrow(x - 6, 30, x, 30)
+    a(fig(d.svg(), "Reading path through the report.", w=135))
     a(sec("Objectives, Scope and Limitations"))
     a(sub("A", "Objectives"))
     a("""<ol class="tight"><li>Implement First-, Best- and Worst-Fit with splitting, coalescing, fragmentation
@@ -141,6 +170,14 @@ but its latency is not modelled; page tables are single-level with no TLB; Next-
 policies are out; compaction is never automatic.</p>""")
 
     # ---------------------------------------------------------- 3
+    a(tab("Key requirements and their priority", ["ID", "Requirement", "Priority"], [
+        ["FR-C2", "alloc, free, terminate, compact operations", "MUST"],
+        ["FR-C5", "invalid requests rejected with a reason, no state change", "MUST"],
+        ["FR-C9", "fragmentation metrics and failure cause", "MUST"],
+        ["FR-P4", "fault handling: lowest free frame, else policy victim", "MUST"],
+        ["FR-P7", "frame sweep with Belady-anomaly detection", "MUST"],
+        ["NFR-1", "same workload + seed &rArr; byte-identical trace", "MUST"],
+        ["NFR-8", "no leaks or undefined behaviour (sanitizers)", "MUST"]], cls="small"))
     a(sec("Operating System Memory Management Concepts"))
     a("""<p><b>From the ground up.</b> Think of memory as one long row of numbered boxes (addresses 0, 1,
 2,&nbsp;&hellip;). A program asks for, say, 212 boxes; the OS must find 212 <i>free boxes in a row</i>, mark
@@ -152,21 +189,32 @@ invalid accesses. Under contiguous allocation each request receives one run of m
 <i>hole</i>: First-Fit takes the first hole that fits, Best-Fit the smallest and Worst-Fit the largest.
 <i>External</i> fragmentation is free memory split into holes too small to use; <i>internal</i>
 fragmentation is unused space inside a block (zero in MemForge, since granted = requested).
-Compaction slides blocks together to merge the holes (Fig.&nbsp;3).</p>""")
+Compaction slides blocks together to merge the holes (Fig.&nbsp;4).</p>""")
     a(fig(F.fig_concepts(), "Address translation, external fragmentation and compaction."))
     a("""<p><b>Why paging?</b> With contiguous allocation, free space ends up scattered in small gaps.
 Paging avoids this: every piece is the same size, so any free slot fits any piece. The cost is a
 lookup table per program that records where each piece currently lives.</p>
 <p>Paging splits logical memory into fixed-size <i>pages</i> and physical memory into equal
-<i>frames</i>; a page table maps one to the other (Fig.&nbsp;4). Under demand paging a page is loaded only
+<i>frames</i>; a page table maps one to the other (Fig.&nbsp;5). Under demand paging a page is loaded only
 on its first use; a reference to a non-resident page is a <i>page fault</i>. When no frame is free, a
 replacement policy picks a victim: FIFO the oldest page, LRU the least recently used, OPT the page used
 furthest in the future. Belady's anomaly&mdash;more frames, more faults&mdash;can occur with FIFO but not
-with stack algorithms such as LRU and OPT (Fig.&nbsp;5).</p>""")
+with stack algorithms such as LRU and OPT (Fig.&nbsp;6).</p>""")
     a(fig(F.fig_paging_concept(), "Paging: the page number is replaced by a frame number."))
     a(fig(F.fig_belady_small(), "Faults vs. frames on the string 1 2 3 4 1 2 5 1 2 3 4 5."))
 
     # ---------------------------------------------------------- 4
+    a(sub("A", "Contiguous Allocation versus Paging"))
+    a(tab("The two approaches side by side", ["Property", "Contiguous", "Paging"], [
+        ["unit of allocation", "variable-size block", "fixed-size page / frame"],
+        ["external fragmentation", "yes (gaps between blocks)", "none"],
+        ["internal fragmentation", "none in MemForge", "last page partly unused"],
+        ["remedy for waste", "compaction (copying)", "replacement (eviction)"]]))
+    a(sub("B", "Why Stack Algorithms Avoid Belady's Anomaly"))
+    a("""<p>A replacement policy is a <i>stack algorithm</i> if the set of pages it keeps with <i>n</i> frames is
+always contained in the set it would keep with <i>n</i>+1 frames (the <i>inclusion property</i>). Then any
+reference that hits with <i>n</i> frames also hits with <i>n</i>+1, so faults can never increase. LRU and OPT
+satisfy inclusion; FIFO, whose contents depend on load order, does not.</p>""")
     a(sec("System Architecture and Design"))
     a(sub("A", "Layered Architecture"))
     a(fig(F.fig_layers(), "Five layers; each layer uses only the ones below it.", w=110))
@@ -174,7 +222,7 @@ with stack algorithms such as LRU and OPT (Fig.&nbsp;5).</p>""")
     a("""<p>The core performs no I/O and reads no wall clock; it uses logical clocks (<i>step</i>,
 <i>t</i>, <i>seq</i>), integer arithmetic and fixed tie-breaks (lowest address, lowest frame). Every
 client goes through the <code>Session</code> facade, which applies one operation, checks invariants and
-publishes the step's events in <code>seq</code> order (Fig.&nbsp;7).</p>""")
+publishes the step's events in <code>seq</code> order (Fig.&nbsp;8).</p>""")
     a(fig(F.fig_dataflow(), "End-to-end data flow of one run.", w=110))
     a(sub("C", "Events, Traces and WebAssembly Bridge"))
     a("""<p>Each step yields events (23 types, Appendix) that the trace writer stores as JSON Lines with a
@@ -202,7 +250,7 @@ the web app, so browser and CLI traces are byte-identical.</p>""")
     a(fig(F.fig_modules(), "Module dependency graph (acyclic, checked by check_layers.sh).", w=125))
     a("""<p>Each module exports only what others need; policies cannot modify engine data, and the core
 may not include <code>stdio.h</code>, <code>time.h</code> or system headers. Policies are
-function-pointer tables registered by name (Fig.&nbsp;11), so a new policy is one file and one
+function-pointer tables registered by name (Fig.&nbsp;12), so a new policy is one file and one
 registry line.</p>""")
     a(fig(F.fig_vtable(), "Policy vtable and registry.", w=115))
 
@@ -213,7 +261,7 @@ registry line.</p>""")
 piece with free neighbours so holes never sit side by side.</p>
 <p>Memory [0,&nbsp;M) is an address-ordered array of <code>ms_block</code> records that tile it
 exactly. Workloads refer to blocks by stable allocation ids, never by address, because compaction moves
-blocks; each id passes through the lifecycle in Fig.&nbsp;12, which rules out duplicate ids and
+blocks; each id passes through the lifecycle in Fig.&nbsp;13, which rules out duplicate ids and
 double frees.</p>""")
     a(fig(F.fig_block_model(), "Block array, block record and allocation-id lifecycle.", w=95))
     a(alg("Block splitting", ["check the hole is free and size &ge; s",
@@ -244,7 +292,7 @@ search-cost metric). Algorithm&nbsp;1 gives all three; they differ only in the s
         "<b>end for</b>",
         "<b>return</b> (best &ne; none, best, scanned = h)"]))
     a("""<p>Strict comparisons keep the lowest address on ties. All three run in O(h) time and O(1) space.
-Fig.&nbsp;14 shows them on the textbook five-hole memory.</p>""")
+Fig.&nbsp;15 shows them on the textbook five-hole memory.</p>""")
     a(fig(F.fig_ac1_policies(), "Placements on the Silberschatz five-hole memory (AC-1).", w=125))
     a("""<p><i>Excluded:</i> Next-Fit (a roving cursor complicates coalescing and compaction for no clear
 gain), size-indexed trees (O(log h) but harder to keep deterministic) and the buddy system
@@ -288,9 +336,9 @@ block order is preserved, and 5,000 random layouts agree with an independent ora
         ["used / free", "781 / 959", "1207 / 533", "781 / 959"]]))
     a("""<p>First- and Worst-Fit fail a4 with 959 units free because the largest hole is 300 (external
 fragmentation). In AC-2, compaction moves 7 blocks (781 units) into one 959-unit hole [781,&nbsp;1740);
-the retried a4 lands at 781, leaving [1207,&nbsp;1740) free (Fig.&nbsp;15).</p>""")
+the retried a4 lands at 781, leaving [1207,&nbsp;1740) free (Fig.&nbsp;16).</p>""")
     a("""<p><b>Experiment E1</b> runs 30 seeded workloads (60/75/90% target utilisation &times; 10 seeds;
-3,000 operations on 1,024 units; sizes 16&ndash;128; allocation probability 0.6). Figs.&nbsp;16&ndash;17
+3,000 operations on 1,024 units; sizes 16&ndash;128; allocation probability 0.6). Figs.&nbsp;17&ndash;18
 plot mean values; Section&nbsp;15 gives 95% confidence intervals.</p>""")
     a(fig(F.fig_e1(0, "allocation success (%)", 86, 100, [86, 90, 94, 98], leg=(70, 72)),
           "E1: allocation success rate vs. target utilisation.", w=75))
@@ -304,11 +352,11 @@ pages (here 4096 bytes); RAM is cut into frames of the same size. A per-program 
 which frame holds each page. To read an address, the hardware splits it into "which page" and "how far
 into the page", looks up the frame, and keeps the offset unchanged.</p>
 <p>The paging subsystem has four parts: MMU, per-process page tables, an inverted frame table and
-the paging engine (Fig.&nbsp;18).</p>""")
+the paging engine (Fig.&nbsp;19).</p>""")
     a(fig(F.fig_pte(), "Page-table entry and inverted frame table."))
     a("""<p>For a power-of-two page size <i>S</i>, k = log<sub>2</sub>S; vpn = va &gt;&gt; k,
-offset = va &amp; (S&minus;1) and pa = (f &lt;&lt; k) | offset (Fig.&nbsp;19). The full access path,
-including hit, fault, eviction and write-back, is Fig.&nbsp;9. Faults are <i>compulsory</i> on a page's
+offset = va &amp; (S&minus;1) and pa = (f &lt;&lt; k) | offset (Fig.&nbsp;20). The full access path,
+including hit, fault, eviction and write-back, is Fig.&nbsp;10. Faults are <i>compulsory</i> on a page's
 first use and <i>capacity</i> afterwards. A hit costs O(1), a fault O(F); space is O(P + F).</p>""")
     a(alg("Paging address translation", ["validate pid and vpn; <b>if</b> invalid <b>then</b> AccessViolation, <b>return</b>",
         "refs &larr; refs + 1", "<b>if</b> page present <b>then</b> PageHit",
@@ -326,13 +374,18 @@ first use and <i>capacity</i> afterwards. A hit costs O(1), a fault O(F); space 
         ["P9, page 0", "no such process", "NO_SUCH_PROCESS"]]))
 
     # ---------------------------------------------------------- 11
+    a(sub("A", "Worked Trace: Three Accesses with Two Frames"))
+    a(tab("Address translation events (page size 4096, 2 frames, LRU)", ["Access", "vpn", "offset", "Outcome", "pa"], [
+        ["P0 @8200 w", "2", "8", "fault, frame 0, dirty", "8"],
+        ["P0 @6700", "1", "2604", "fault, frame 1", "6700"],
+        ["P0 @20000", "4", "3616", "fault, evicts frame 1", "7712"]]))
     a(sec("FIFO, LRU and Optimal Replacement"))
     a("""<p>When a needed page is not in RAM and every frame is already full, some page must be thrown out
 to make room. A good choice throws out a page that will not be needed soon; a bad choice throws out a
 page that is needed again immediately, causing another fault. FIFO, LRU and OPT are three rules for
 making this choice.</p>
 <p>A replacement policy keeps only its own bookkeeping and answers one question: which frame to
-evict. The engine calls its hooks in a fixed order (Fig.&nbsp;21); ties go to the lowest frame.</p>""")
+evict. The engine calls its hooks in a fixed order (Fig.&nbsp;22); ties go to the lowest frame.</p>""")
     a(fig(F.fig_hooks(), "Order of replacement-policy hooks on a hit and on a fault."))
     a(alg("Victim selection for FIFO, LRU and OPT", [
         "<b>input:</b> full frames 0..F&minus;1, current time t",
@@ -365,6 +418,22 @@ evicts page 0, which is needed immediately, while LRU and OPT evict page 1.</p>"
 so every reference faults.</p>""")
 
     # ---------------------------------------------------------- 13
+    a(alg("Frames table for memsim refs --table", [
+        "frames &larr; [empty] &times; F; columns &larr; [ ]",
+        "<b>for</b> t &larr; 0 <b>to</b> n &minus; 1 <b>do</b>",
+        "&nbsp;&nbsp;<b>if</b> ref[t] &isin; frames <b>then</b> mark hit; policy.on_access(t)",
+        "&nbsp;&nbsp;<b>else</b> mark F; i &larr; lowest empty frame <b>or</b> policy.victim(t); frames[i] &larr; ref[t]",
+        "&nbsp;&nbsp;append copy of frames to columns",
+        "print the reference row, one row per frame, and the fault row"]))
+    a(alg("Belady frame sweep", [
+        "<b>for</b> F &larr; F<sub>min</sub> <b>to</b> F<sub>max</sub> <b>do</b> faults[F] &larr; run(refs, F, policy)",
+        "<b>for</b> F &larr; F<sub>min</sub> + 1 <b>to</b> F<sub>max</sub> <b>do</b>",
+        "&nbsp;&nbsp;<b>if</b> faults[F] &gt; faults[F &minus; 1] <b>then</b> report anomaly point F (printed with *)"]))
+    a("""<p>The sweep simply reruns the whole string for each frame count; the anomaly is any point where the
+curve rises. For the AC-4 string FIFO reports one anomaly point (F = 4), LRU and OPT none.</p>""")
+    a(tab("AC-4 sweep: faults for 1&ndash;6 frames", ["Policy", "1", "2", "3", "4", "5", "6"], [
+        ["FIFO", "12", "12", "9", "<b>10</b>", "5", "5"], ["LRU", "12", "12", "10", "8", "5", "5"],
+        ["OPT", "12", "9", "7", "6", "5", "5"]]))
     a(sec("Paging Results and Comparison"))
     a(tab("E4 configuration", ["Parameter", "Value"], [
         ["virtual pages / page size", "32 / 4096 B"], ["references per run", "2,000"],
@@ -379,7 +448,7 @@ so every reference faults.</p>""")
         ["16", "106.7 &plusmn; 9.0", "83.5 &plusmn; 5.5", "53.2 &plusmn; 3.2"]], cls="small"))
     a("""<p>Smooth locality hides non-monotonic behaviour, but the AC-4 sweep exposes it: FIFO gives
 12,&nbsp;12,&nbsp;9,&nbsp;10,&nbsp;5,&nbsp;5 faults for 1&ndash;6 frames while LRU and OPT never rise
-(Fig.&nbsp;5). In practice OPT is unimplementable, FIFO is simple but anomalous, and LRU is strong under
+(Fig.&nbsp;6). In practice OPT is unimplementable, FIFO is simple but anomalous, and LRU is strong under
 locality but costly, which is why real systems approximate it with Clock.</p>""")
 
     # ---------------------------------------------------------- 14
@@ -392,6 +461,16 @@ comparison fair.</p>""")
     a(fig(F.fig_metrics(), "One collector derives every metric from the event stream."))
 
     # ---------------------------------------------------------- 15
+    a(alg("refs-locality generator (seeded)", [
+        "rng &larr; xoshiro256** seeded by SplitMix64(seed)",
+        "<b>for</b> t &larr; 0 <b>to</b> n &minus; 1 <b>do</b>",
+        "&nbsp;&nbsp;<b>if</b> t mod phase = 0 <b>then</b> pick a new working set of w pages",
+        "&nbsp;&nbsp;<b>if</b> rng &lt; p<sub>out</sub> <b>then</b> page &larr; uniform over all pages",
+        "&nbsp;&nbsp;<b>else</b> page &larr; uniform over the working set",
+        "&nbsp;&nbsp;emit <code>access P0 page</code>"]))
+    a("""<p>The <code>alloc-uniform</code> generator works the same way for memory: it allocates with
+probability p<sub>alloc</sub> (sizes uniform in [min, max]) while live memory is below the utilisation target,
+and otherwise frees a random live block. Integer-only arithmetic makes the output identical on every platform.</p>""")
     a(sec("Benchmarking and Performance Analysis"))
     a("""<p>Each benchmark below is reported in the same four parts: <b>setup</b>, <b>result table</b>,
 <b>chart</b> and <b>finding</b>. Values are mean &plusmn; 95% CI over 10 seeds.</p>""")
@@ -419,13 +498,27 @@ each on 1,024 units, request sizes 16&ndash;128, no compaction.</p>""")
         ["Reproducibility", "every cell regenerates from generator + seed + git revision"]]))
     a(sub("B", "Benchmark E4: Page Faults against Frames"))
     a("""<p><b>Setup.</b> 10 seeds &times; 2,000 references, 32 pages, working set 6, phase change every 200
-references; FIFO, LRU, OPT at 2&ndash;16 frames. <b>Result:</b> Table&nbsp;X and Fig.&nbsp;27 (Section 13).</p>""")
+references; FIFO, LRU, OPT at 2&ndash;16 frames. <b>Result:</b> Table&nbsp;XIV and Fig.&nbsp;28 (Section 13).</p>""")
     a(tab("E4 findings", ["Aspect", "Finding"], [
         ["Ordering", "OPT &lt; LRU &lt; FIFO at every frame count"],
         ["At 8 frames", "103.2 (OPT), 138.9 (LRU), 253.1 (FIFO) faults"],
         ["Anomaly", "only FIFO, on the AC-4 string: 9 &rarr; 10 faults"]]))
 
     # ---------------------------------------------------------- 16
+    a(sub("C", "How the Confidence Intervals are Computed"))
+    a(alg("Mean and 95% confidence interval over seeds", [
+        "x<sub>1</sub>..x<sub>n</sub> &larr; metric for each seed (n = 10)",
+        "mean &larr; (&Sigma; x<sub>i</sub>) / n",
+        "s &larr; sqrt( &Sigma; (x<sub>i</sub> &minus; mean)<sup>2</sup> / (n &minus; 1) )",
+        "half &larr; t<sub>0.975, n&minus;1</sub> &middot; s / sqrt(n)&nbsp;&nbsp;&nbsp;(t = 2.262 for n = 10)",
+        "<b>report</b> mean &plusmn; half"]))
+    a("""<p>Because every policy runs on the same ten workload files, differences between policies are
+<i>paired</i>: seed-to-seed noise affects all policies equally, so even small gaps such as Best-Fit's
+1.4-point lead over First-Fit at 90% are reliable.</p>""")
+    a("""<p><b>Reading the two benchmarks together.</b> E1 and E4 show the same trade-off from two sides:
+the policy that uses more information (Best-Fit looks at every hole; OPT looks into the future) gives the
+best result, while the cheapest policy (First-Fit; FIFO) is good enough at low pressure and degrades first
+as memory becomes scarce.</p>""")
     a(sec("Testing Strategy and Correctness"))
     a("""<p>Testing answers one question: does the simulator give the right answers? We check it against
 textbook examples whose answers are known, check internal consistency rules after every single step,
@@ -438,6 +531,11 @@ Expected values are written into each test before it is compared with the engine
 Silberschatz textbook or from Belady's original paper.</p>""")
 
     # ---------------------------------------------------------- 17
+    a(tab("Contiguous invariants checked after every step", ["ID", "Invariant"], [
+        ["I1", "blocks tile [0, M) exactly, in address order"], ["I2", "no two adjacent free blocks"],
+        ["I3", "free blocks carry no pid or alloc id"], ["I4", "every live id maps to exactly one block"],
+        ["I5", "granted size &ge; requested size &gt; 0"], ["I6", "total used + total free = M"],
+        ["I7", "per-id state table agrees with the blocks"]], cls="small"))
     a(sec("Test Cases and Test Results"))
     a(tab("Acceptance criteria (verify_report.sh)", ["ID", "Scenario", "Expected", "Result"], [
         ["AC-1", "five-hole placement", "FF/WF fail a4, BF places all", "PASS"],
@@ -460,6 +558,15 @@ Silberschatz textbook or from Belady's original paper.</p>""")
     a(fig(d.svg(), "Automated test suites (all passing)."))
 
     # ---------------------------------------------------------- 18
+    a(alg("Determinism check (AC-6)", [
+        "<b>for each</b> fixture f <b>and</b> policy p <b>do</b>",
+        "&nbsp;&nbsp;h<sub>1</sub> &larr; SHA-256(trace of memsim run f --policy p)",
+        "&nbsp;&nbsp;h<sub>2</sub> &larr; SHA-256(trace of a second, independent run)",
+        "&nbsp;&nbsp;<b>assert</b> h<sub>1</sub> = h<sub>2</sub>",
+        "web test: <b>assert</b> wasm trace = native trace byte for byte"]))
+    a("""<p>Every acceptance test follows the same pattern: the expected value is fixed in the test first,
+the engine runs the fixture, and the test compares the two. A failure prints both values and the step at
+which they diverge.</p>""")
     a(sec("User Interface and Workflow"))
     a(fig(F.fig_cli(), "The memsim command-line interface."))
     a(fig(F.fig_web(), "Layout of the Contiguous page of the web laboratory."))
@@ -486,6 +593,13 @@ Silberschatz textbook or from Belady's original paper.</p>""")
             "schema 1 / kind contiguous / memory_size 1024 /", "gen_name alloc-uniform / gen_seed 7 / gen_ops 2000"]))
 
     # ---------------------------------------------------------- 20
+    a(term(["$ memsim refs \"7 0 1 2 0 3 0 4 2 3 0 3 2 1 2 0 1 7 0 1\" \\",
+            "    --frames 3 --policy fifo --table",
+            "7 0 1 2 0 3 0 4 2 3 0 3 2 1 2 0 1 7 0 1",
+            "7 7 7 2 2 2 2 4 4 4 0 0 0 0 0 0 0 7 7 7",
+            "  0 0 0 0 3 3 3 2 2 2 2 2 1 1 1 1 1 0 0",
+            "    1 1 1 1 0 0 0 3 3 3 3 3 2 2 2 2 2 1",
+            "F F F F   F F F F F F     F F     F F F"]))
     a(sec("Repository Structure and Development Conventions"))
     a(fig(F.fig_repo(), "Top-level repository layout."))
     a(fig(F.fig_layer_chain(), "Allowed include direction between module layers."))
@@ -495,6 +609,13 @@ Silberschatz textbook or from Belady's original paper.</p>""")
         ["commits", "pre-commit: format + layering"]]))
 
     # ---------------------------------------------------------- 21
+    a(term(["src/<module>/",
+            "  CMakeLists.txt               memsim_module(<module> DEPS ... SOURCES ...)",
+            "  include/memsim/<module>/*.h  exported interface",
+            "  *.h, *.c                     private implementation",
+            "  policies/*.c                 one file per policy"]))
+    a("""<p>A new policy therefore touches exactly three places: one source file under <code>policies/</code>,
+one <code>SOURCES</code> line and one registry line. No engine code changes.</p>""")
     a(sec("Build System and Continuous Integration"))
     a(fig(F.fig_build(), "Build orchestration: native presets and the WebAssembly build."))
     a(tab("CMake presets", ["Preset", "Configuration", "Use"], [
@@ -518,6 +639,14 @@ pre-commit; Python 3 + matplotlib for experiments; Node.js and Clang/lld/wasi-li
     a("<p>A hosted copy of the lab is at memforge.aryagupta-dev.xyz.</p>")
 
     # ---------------------------------------------------------- 23
+    a(term(["$ bash scripts/build_wasm.sh      # writes web/public/memsim.wasm",
+            "$ cd web && npm ci", "$ npm run dev                     # http://localhost:5173",
+            "$ npm test                        # wasm trace must equal CLI trace"]))
+    a(tab("Common problems", ["Symptom", "Fix"], [
+        ["exit code 2", "workload error: read the file:line in the message"],
+        ["exit code 3", "invariant violated: a bug; run the dev preset for a stack trace"],
+        ["wasm build fails", "install wasi-libc and lld"],
+        ["warnings fail CI only", "configure locally with -DMEMSIM_WERROR=ON"]]))
     a(sec("Conclusion and Future Scope"))
     a("""<p>MemForge meets its goals: a deterministic, modular C17 simulator that reproduces the textbook
 examples exactly and compares policies fairly. Best-Fit gives the best success and lowest fragmentation,
@@ -537,6 +666,21 @@ local replacement; Knuth's fifty-percent rule; real program traces; fuzzing and 
     # ---------------------------------------------------------- refs
     TOC_ENTRIES.extend([(t, k) for t, k in TOC])
     TOC_ENTRIES.append(("Appendix", "24. APPENDIX"))
+
+    d = F.D(340, 110)
+    pairs = [("Single-level tables, no TLB", "TLB + two-level tables"), ("No Next-Fit / buddy", "Next-Fit, buddy allocator"),
+             ("No Clock / LFU", "Clock (second chance), LFU"), ("Synthetic workloads", "real program traces")]
+    d.text(84, 10, "current limitation", 7.6, bold=True)
+    d.text(256, 10, "future work", 7.6, bold=True)
+    for i, (x1, x2) in enumerate(pairs):
+        y = 16 + i * 23
+        d.box(4, y, 160, 18, x1, 7.2)
+        d.box(176, y, 160, 18, x2, 7.2, fill="#d9d9d9")
+        d.arrow(164, y + 9, 176, y + 9)
+    a(fig(d.svg(), "From current limitations to future work.", w=125))
+    a("""<p>In short, MemForge turns two chapters of an operating-systems textbook into something that can be
+run, measured and checked: every example in the book is reproduced exactly, and every claim about which
+policy is better is backed by a repeatable experiment.</p>""")
 
     # ---------------------------------------------------------- appendix
     a('<h2 id="app">24. APPENDIX</h2>')

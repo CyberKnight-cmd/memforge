@@ -25,9 +25,10 @@ _alg = [0]
 TOC = []
 
 
-def fig(svg, cap, wide=False):
+def fig(svg, cap, w=None):
     _fig[0] += 1
-    return (f'<figure class="fig"><div class="art">{svg}</div>'
+    st = f' style="width:{w}mm"' if w else ""
+    return (f'<figure class="fig"{st}><div class="art">{svg}</div>'
             f'<figcaption>Fig. {_fig[0]}. {cap}</figcaption></figure>')
 
 
@@ -168,13 +169,13 @@ with stack algorithms such as LRU and OPT (Fig.&nbsp;5).</p>""")
     # ---------------------------------------------------------- 4
     a(sec("System Architecture and Design"))
     a(sub("A", "Layered Architecture"))
-    a(fig(F.fig_layers(), "Five layers; each layer uses only the ones below it."))
+    a(fig(F.fig_layers(), "Five layers; each layer uses only the ones below it.", w=110))
     a(sub("B", "Deterministic Core and Session Facade"))
     a("""<p>The core performs no I/O and reads no wall clock; it uses logical clocks (<i>step</i>,
 <i>t</i>, <i>seq</i>), integer arithmetic and fixed tie-breaks (lowest address, lowest frame). Every
 client goes through the <code>Session</code> facade, which applies one operation, checks invariants and
 publishes the step's events in <code>seq</code> order (Fig.&nbsp;7).</p>""")
-    a(fig(F.fig_dataflow(), "End-to-end data flow of one run."))
+    a(fig(F.fig_dataflow(), "End-to-end data flow of one run.", w=110))
     a(sub("C", "Events, Traces and WebAssembly Bridge"))
     a("""<p>Each step yields events (23 types, Appendix) that the trace writer stores as JSON Lines with a
 snapshot after every step. The same C modules are compiled with Clang for the WASI target and loaded by
@@ -186,8 +187,8 @@ the web app, so browser and CLI traces are byte-identical.</p>""")
         ["Integer-only state", "identical output on every machine"],
         ["Global frame pool", "matches textbook examples"], ["Plain-text workloads", "no JSON parser in C"]]))
     a(sub("D", "Component Workflows"))
-    a(fig(F.fig_alloc_seq(), "Allocation sequence in the contiguous subsystem."))
-    a(fig(F.fig_access_flow(), "Paged memory access with fault handling and replacement."))
+    a(fig(F.fig_alloc_seq(), "Allocation sequence in the contiguous subsystem.", w=105))
+    a(fig(F.fig_access_flow(), "Paged memory access with fault handling and replacement.", w=100))
 
     # ---------------------------------------------------------- 5
     a(sec("Module Description and Dependencies"))
@@ -198,12 +199,12 @@ the web app, so browser and CLI traces are byte-identical.</p>""")
         ["trace", "JSONL writer and snapshots"], ["workloads", "loader, validator, seeded generators"],
         ["metrics", "every reported figure, from events"], ["session", "facade: apply, check, publish"],
         ["bench", "runner over workload &times; policy &times; seed"], ["cli", "memsim commands, SHA-256"]]))
-    a(fig(F.fig_modules(), "Module dependency graph (acyclic, checked by check_layers.sh)."))
+    a(fig(F.fig_modules(), "Module dependency graph (acyclic, checked by check_layers.sh).", w=125))
     a("""<p>Each module exports only what others need; policies cannot modify engine data, and the core
 may not include <code>stdio.h</code>, <code>time.h</code> or system headers. Policies are
 function-pointer tables registered by name (Fig.&nbsp;11), so a new policy is one file and one
 registry line.</p>""")
-    a(fig(F.fig_vtable(), "Policy vtable and registry."))
+    a(fig(F.fig_vtable(), "Policy vtable and registry.", w=115))
 
     # ---------------------------------------------------------- 6
     a(sec("Memory Model and Allocation State"))
@@ -214,16 +215,15 @@ piece with free neighbours so holes never sit side by side.</p>
 exactly. Workloads refer to blocks by stable allocation ids, never by address, because compaction moves
 blocks; each id passes through the lifecycle in Fig.&nbsp;12, which rules out duplicate ids and
 double frees.</p>""")
-    a(fig(F.fig_block_model(), "Block array, block record and allocation-id lifecycle."))
+    a(fig(F.fig_block_model(), "Block array, block record and allocation-id lifecycle.", w=95))
     a(alg("Block splitting", ["check the hole is free and size &ge; s",
         "<b>if</b> size &gt; s <b>then</b> insert a free block [start + s, end) after it",
         "set size &larr; s, pid, alloc_id, requested; mark ALLOCATED", "<b>return</b> block index"]))
     a(alg("Block freeing and coalescing", ["verify the block is ALLOCATED",
         "mark FREE; clear pid and alloc_id", "<b>if</b> right neighbour is free <b>then</b> merge it",
         "<b>if</b> left neighbour is free <b>then</b> merge into it"]))
-    a(fig(F.fig_split_coalesce(), "Splitting a hole on allocation and coalescing on free."))
-    a(tab("Model operations", ["Operation", "Time", "Space"], [
-        ["split", "O(1), O(N) worst (shift)", "O(1)"], ["free + coalesce", "O(1), O(N) worst", "O(1)"]]))
+    a(fig(F.fig_split_coalesce(), "Splitting a hole on allocation and coalescing on free.", w=90))
+    a("<p>Splitting and freeing cost O(1) when no block has to shift and O(N) in the worst case (array shift); both use O(1) extra space.</p>")
 
     # ---------------------------------------------------------- 7
     a(sec("First-Fit, Best-Fit and Worst-Fit Algorithms"))
@@ -245,7 +245,7 @@ search-cost metric). Algorithm&nbsp;1 gives all three; they differ only in the s
         "<b>return</b> (best &ne; none, best, scanned = h)"]))
     a("""<p>Strict comparisons keep the lowest address on ties. All three run in O(h) time and O(1) space.
 Fig.&nbsp;14 shows them on the textbook five-hole memory.</p>""")
-    a(fig(F.fig_ac1_policies(), "Placements on the Silberschatz five-hole memory (AC-1)."))
+    a(fig(F.fig_ac1_policies(), "Placements on the Silberschatz five-hole memory (AC-1).", w=125))
     a("""<p><i>Excluded:</i> Next-Fit (a roving cursor complicates coalescing and compaction for no clear
 gain), size-indexed trees (O(log h) but harder to keep deterministic) and the buddy system
 (power-of-two sizes cause internal fragmentation).</p>""")
@@ -261,10 +261,20 @@ pieces to one end so the gaps merge into one big hole, at the cost of copying da
         ["ext_frag", "1 &minus; largest_hole / total_free (0 if none free), in ppm"],
         ["failure cause", "FRAGMENTATION if total_free &ge; s &gt; largest; else CAPACITY"],
         ["blocks_moved, units_moved", "cost of compaction"]]))
-    a("""<p>Ratios are integer parts-per-million, (p/w)&middot;10<sup>6</sup> + ((p mod w)&middot;10<sup>6</sup>)/w,
-so every machine prints the same value (Fig.&nbsp;15).</p>""")
-    a(fig(F.fig_frag_metrics(), "Fragmentation metrics when First-Fit fails the 426-unit request."))
-    a(fig(F.fig_compaction(), "Compaction pipeline and its effect on AC-2."))
+
+    a(alg("External fragmentation and failure cause (integer, ppm)", [
+        "total &larr; &Sigma; hole sizes; largest &larr; max hole size",
+        "<b>if</b> total = 0 <b>then</b> ext_frag &larr; 0 <b>else</b> ext_frag &larr; 10<sup>6</sup> &minus; ppm(largest, total)",
+        "<b>on failed request</b> s: cause &larr; FRAGMENTATION <b>if</b> total &ge; s <b>else</b> CAPACITY"]))
+    a("<p>Example: First-Fit fails 426 with 959 free and largest hole 300, so ext_frag = 1 &minus; 300/959 = 0.687 and the cause is FRAGMENTATION.</p>")
+    a(alg("Sliding compaction", [
+        "next &larr; 0; moves &larr; [ ]",
+        "<b>for each</b> allocated block b <b>in</b> address order <b>do</b>",
+        "&nbsp;&nbsp;<b>if</b> b.start &ne; next <b>then</b> append (b.id, b.start, next) to moves",
+        "&nbsp;&nbsp;next &larr; next + b.size",
+        "validate moves (sources match, ascending); apply; emit BlockRelocated per move",
+        "replace all free blocks by one hole [next, M)"]))
+    a(fig(F.fig_compaction(), "Compaction pipeline and its effect on AC-2.", w=88))
     a("""<p>Tested guarantees: the live set and total free memory are unchanged, at most one hole remains,
 block order is preserved, and 5,000 random layouts agree with an independent oracle.</p>""")
 
@@ -278,16 +288,14 @@ block order is preserved, and 5,000 random layouts agree with an independent ora
         ["used / free", "781 / 959", "1207 / 533", "781 / 959"]]))
     a("""<p>First- and Worst-Fit fail a4 with 959 units free because the largest hole is 300 (external
 fragmentation). In AC-2, compaction moves 7 blocks (781 units) into one 959-unit hole [781,&nbsp;1740);
-the retried a4 lands at 781, leaving [1207,&nbsp;1740) free (Fig.&nbsp;16).</p>""")
+the retried a4 lands at 781, leaving [1207,&nbsp;1740) free (Fig.&nbsp;15).</p>""")
     a("""<p><b>Experiment E1</b> runs 30 seeded workloads (60/75/90% target utilisation &times; 10 seeds;
-3,000 operations on 1,024 units; sizes 16&ndash;128; allocation probability 0.6). Figs.&nbsp;17&ndash;18
-plot mean values; Section&nbsp;XV gives 95% confidence intervals.</p>""")
+3,000 operations on 1,024 units; sizes 16&ndash;128; allocation probability 0.6). Figs.&nbsp;16&ndash;17
+plot mean values; Section&nbsp;15 gives 95% confidence intervals.</p>""")
     a(fig(F.fig_e1(0, "allocation success (%)", 86, 100, [86, 90, 94, 98], leg=(70, 72)),
-          "E1: allocation success rate vs. target utilisation."))
+          "E1: allocation success rate vs. target utilisation.", w=75))
     a(fig(F.fig_e1(2, "holes scanned / request", 2, 6, [2, 3, 4, 5, 6], leg=(70, 18)),
-          "E1: search cost (mean holes scanned per request)."))
-    a("""<p>Best-Fit wins on success and fragmentation, Worst-Fit loses on both, and First-Fit is the
-cheapest to run. All policies degrade as utilisation rises.</p>""")
+          "E1: search cost (mean holes scanned per request).", w=75))
 
     # ---------------------------------------------------------- 10
     a(sec("Paging Model and Address Translation"))
@@ -296,10 +304,10 @@ pages (here 4096 bytes); RAM is cut into frames of the same size. A per-program 
 which frame holds each page. To read an address, the hardware splits it into "which page" and "how far
 into the page", looks up the frame, and keeps the offset unchanged.</p>
 <p>The paging subsystem has four parts: MMU, per-process page tables, an inverted frame table and
-the paging engine (Fig.&nbsp;19).</p>""")
+the paging engine (Fig.&nbsp;18).</p>""")
     a(fig(F.fig_pte(), "Page-table entry and inverted frame table."))
     a("""<p>For a power-of-two page size <i>S</i>, k = log<sub>2</sub>S; vpn = va &gt;&gt; k,
-offset = va &amp; (S&minus;1) and pa = (f &lt;&lt; k) | offset (Fig.&nbsp;20). The full access path,
+offset = va &amp; (S&minus;1) and pa = (f &lt;&lt; k) | offset (Fig.&nbsp;19). The full access path,
 including hit, fault, eviction and write-back, is Fig.&nbsp;9. Faults are <i>compulsory</i> on a page's
 first use and <i>capacity</i> afterwards. A hit costs O(1), a fault O(F); space is O(P + F).</p>""")
     a(alg("Paging address translation", ["validate pid and vpn; <b>if</b> invalid <b>then</b> AccessViolation, <b>return</b>",
@@ -324,13 +332,20 @@ to make room. A good choice throws out a page that will not be needed soon; a ba
 page that is needed again immediately, causing another fault. FIFO, LRU and OPT are three rules for
 making this choice.</p>
 <p>A replacement policy keeps only its own bookkeeping and answers one question: which frame to
-evict. The engine calls its hooks in a fixed order (Fig.&nbsp;22); ties go to the lowest frame.</p>""")
+evict. The engine calls its hooks in a fixed order (Fig.&nbsp;21); ties go to the lowest frame.</p>""")
     a(fig(F.fig_hooks(), "Order of replacement-policy hooks on a hit and on a fault."))
+    a(alg("Victim selection for FIFO, LRU and OPT", [
+        "<b>input:</b> full frames 0..F&minus;1, current time t",
+        "<b>FIFO:</b> <b>return</b> frame with smallest load_time",
+        "<b>LRU:</b> <b>return</b> frame with smallest last_use",
+        "<b>OPT:</b> <b>for each</b> frame f: nu(f) &larr; next index &gt; t where its page is referenced (&infin; if never)",
+        "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>return</b> frame with largest nu(f)",
+        "ties: lowest frame index; hooks update load_time on load and last_use on every access"]))
     a(tab("Replacement policies compared", ["Policy", "State", "Per fault", "Future?", "Stack?"], [
         ["FIFO", "load time / frame", "O(F)", "no", "no"], ["LRU", "last use / frame", "O(F)", "no", "yes"],
         ["OPT", "next-use table", "O(F)", "yes", "yes"]]))
     a("""<p>OPT evicts the page whose next use is furthest away, which can never cause an earlier fault
-than any other choice [3]; it is therefore the lower bound used to judge FIFO and LRU. Because it needs
+than any other choice (Belady, 1966); it is therefore the lower bound used to judge FIFO and LRU. Because it needs
 the whole reference string, the session refuses OPT in live interactive runs.</p>""")
 
     # ---------------------------------------------------------- 12
@@ -340,12 +355,12 @@ Silberschatz with 3 frames (AC-3). Shaded cells mark the frame loaded on a fault
     for pol, n in [("fifo", "FIFO: 15 faults (6 compulsory, 9 capacity)"),
                    ("lru", "LRU: 12 faults (6 compulsory, 6 capacity)"),
                    ("opt", "OPT: 9 faults (6 compulsory, 3 capacity)")]:
-        a(fig(F.grid(F.AC3, 3, pol, cell=14.2), n + "."))
+        a(fig(F.grid(F.AC3, 3, pol, cell=14.2), n + ".", w=100))
     a("""<p>All three evict page 7 at reference 4. They first diverge at reference 6 (page 3): FIFO
 evicts page 0, which is needed immediately, while LRU and OPT evict page 1.</p>""")
     a(sub("A", "Belady's Anomaly (AC-4)"))
-    a(fig(F.grid(F.AC4, 3, "fifo", cell=16), "FIFO, 3 frames: 9 faults."))
-    a(fig(F.grid(F.AC4, 4, "fifo", cell=16), "FIFO, 4 frames: 10 faults."))
+    a(fig(F.grid(F.AC4, 3, "fifo", cell=16), "FIFO, 3 frames: 9 faults.", w=82))
+    a(fig(F.grid(F.AC4, 4, "fifo", cell=16), "FIFO, 4 frames: 10 faults.", w=82))
     a("""<p>With 4 frames, from the seventh reference on FIFO always evicts exactly the page needed next,
 so every reference faults.</p>""")
 
@@ -378,9 +393,14 @@ comparison fair.</p>""")
 
     # ---------------------------------------------------------- 15
     a(sec("Benchmarking and Performance Analysis"))
-    a(fig(F.fig_bench_pipe(), "Experiment pipeline (paired, seeded, reproducible)."))
-    a(tab("E1 results without compaction, mean &plusmn; 95% CI", ["Util.", "Policy", "Success %", "Frag. fail.",
-                                                                   "Scanned", "Ext. frag."], [
+    a("""<p>Each benchmark below is reported in the same four parts: <b>setup</b>, <b>result table</b>,
+<b>chart</b> and <b>finding</b>. Values are mean &plusmn; 95% CI over 10 seeds.</p>""")
+    a(fig(F.fig_bench_pipe(), "Experiment pipeline (paired, seeded, reproducible).", w=82))
+    a(sub("A", "Benchmark E1: Placement Policies under Memory Pressure"))
+    a("""<p><b>Setup.</b> 30 workloads (60%, 75%, 90% target utilisation &times; 10 seeds), 3,000 operations
+each on 1,024 units, request sizes 16&ndash;128, no compaction.</p>""")
+    a(tab("E1 results, mean &plusmn; 95% CI", ["Util.", "Policy", "Success %", "Frag. fail.",
+                                                "Scanned", "Ext. frag."], [
         ["60%", "FF", "99.9 &plusmn; 0.0", "1.2 &plusmn; 0.7", "2.29", "0.359"],
         ["60%", "BF", "100.0 &plusmn; 0.0", "0.3 &plusmn; 0.3", "3.77", "0.322"],
         ["60%", "WF", "99.0 &plusmn; 0.2", "14.3 &plusmn; 3.1", "3.88", "0.546"],
@@ -391,11 +411,19 @@ comparison fair.</p>""")
         ["90%", "BF", "91.4 &plusmn; 0.4", "127.7 &plusmn; 7.0", "5.24", "0.473"],
         ["90%", "WF", "87.2 &plusmn; 0.7", "192.0 &plusmn; 11.1", "5.19", "0.629"]], cls="small"))
     a(fig(F.fig_e1(1, "fragmentation failures", 0, 200, [0, 50, 100, 150, 200], leg=(70, 18)),
-          "E1: requests failed by fragmentation despite enough free memory."))
-    a("""<p><b>Quality:</b> Best-Fit has the highest success and lowest fragmentation at every level.
-<b>Cost:</b> First-Fit scans 2.3&ndash;3.2 holes vs. 3.8&ndash;5.2. <b>Pressure:</b> at 90%,
-fragmentation failures reach 149 (FF), 128 (BF) and 192 (WF). <b>Reproducibility:</b> every cell
-regenerates from the generator, the seed and the git revision.</p>""")
+          "E1: requests failed by fragmentation despite enough free memory.", w=66))
+    a(tab("E1 findings", ["Aspect", "Finding"], [
+        ["Quality", "Best-Fit: highest success, lowest fragmentation at every level"],
+        ["Cost", "First-Fit scans 2.3&ndash;3.2 holes vs. 3.8&ndash;5.2 for the others"],
+        ["Pressure", "at 90%: 149 (FF), 128 (BF), 192 (WF) fragmentation failures"],
+        ["Reproducibility", "every cell regenerates from generator + seed + git revision"]]))
+    a(sub("B", "Benchmark E4: Page Faults against Frames"))
+    a("""<p><b>Setup.</b> 10 seeds &times; 2,000 references, 32 pages, working set 6, phase change every 200
+references; FIFO, LRU, OPT at 2&ndash;16 frames. <b>Result:</b> Table&nbsp;X and Fig.&nbsp;27 (Section 13).</p>""")
+    a(tab("E4 findings", ["Aspect", "Finding"], [
+        ["Ordering", "OPT &lt; LRU &lt; FIFO at every frame count"],
+        ["At 8 frames", "103.2 (OPT), 138.9 (LRU), 253.1 (FIFO) faults"],
+        ["Anomaly", "only FIFO, on the AC-4 string: 9 &rarr; 10 faults"]]))
 
     # ---------------------------------------------------------- 16
     a(sec("Testing Strategy and Correctness"))
@@ -407,7 +435,7 @@ run it twice to confirm identical output, and run memory-error detectors over th
     a("""<p>Randomised oracles: 5,000 compactions match a unit-by-unit oracle; no policy beats OPT; LRU and
 OPT never show Belady's anomaly; every fixture run twice gives equal SHA-256 trace digests (AC-6).
 Expected values are written into each test before it is compared with the engine, taken from the
-textbook [1] or from Belady's paper [4].</p>""")
+Silberschatz textbook or from Belady's original paper.</p>""")
 
     # ---------------------------------------------------------- 17
     a(sec("Test Cases and Test Results"))
@@ -508,26 +536,10 @@ local replacement; Knuth's fifty-percent rule; real program traces; fuzzing and 
 
     # ---------------------------------------------------------- refs
     TOC_ENTRIES.extend([(t, k) for t, k in TOC])
-    TOC_ENTRIES.append(("References", "24. REFERENCES"))
-    TOC_ENTRIES.append(("Appendix", "25. APPENDIX"))
-    a('<h2 id="refs">24. REFERENCES</h2>')
-    refs = [
-        "A. Silberschatz, P. B. Galvin and G. Gagne, <i>Operating System Concepts</i>, 10th ed. Hoboken, NJ, USA: Wiley, 2018.",
-        "A. S. Tanenbaum and H. Bos, <i>Modern Operating Systems</i>, 4th ed. Boston, MA, USA: Pearson, 2015.",
-        "L. A. Belady, &ldquo;A study of replacement algorithms for a virtual-storage computer,&rdquo; <i>IBM Syst. J.</i>, vol. 5, no. 2, pp. 78&ndash;101, 1966.",
-        "L. A. Belady, R. A. Nelson and G. S. Shedler, &ldquo;An anomaly in space-time characteristics of certain programs running in a paging machine,&rdquo; <i>Commun. ACM</i>, vol. 12, no. 6, pp. 349&ndash;353, Jun. 1969.",
-        "D. E. Knuth, <i>The Art of Computer Programming, Vol. 1: Fundamental Algorithms</i>, 3rd ed. Reading, MA, USA: Addison-Wesley, 1997, sec. 2.5.",
-        "P. J. Denning, &ldquo;The working set model for program behavior,&rdquo; <i>Commun. ACM</i>, vol. 11, no. 5, pp. 323&ndash;333, May 1968.",
-        "R. L. Mattson, J. Gecsei, D. R. Slutz and I. L. Traiger, &ldquo;Evaluation techniques for storage hierarchies,&rdquo; <i>IBM Syst. J.</i>, vol. 9, no. 2, pp. 78&ndash;117, 1970.",
-        "D. Blackman and S. Vigna, &ldquo;Scrambled linear pseudorandom number generators,&rdquo; <i>ACM Trans. Math. Softw.</i>, vol. 47, no. 4, art. 36, 2021.",
-        "<i>Information Technology&mdash;Programming Languages&mdash;C</i>, ISO/IEC 9899:2018.",
-        "WebAssembly Community Group, <i>WebAssembly Core Specification</i>, W3C.",
-        "Kitware, <i>CMake Reference Documentation</i>. [Online]. Available: https://cmake.org/documentation/",
-        "<i>Svelte Documentation</i>, https://svelte.dev/docs; <i>Valgrind User Manual</i>, https://valgrind.org/docs/manual/."]
-    a('<ol class="refs">' + "".join(f"<li>{r}</li>" for r in refs) + "</ol>")
+    TOC_ENTRIES.append(("Appendix", "24. APPENDIX"))
 
     # ---------------------------------------------------------- appendix
-    a('<h2 id="app">25. APPENDIX</h2>')
+    a('<h2 id="app">24. APPENDIX</h2>')
     a(tab("Complete AC-1 comparison metrics", ["Metric", "FF", "BF", "WF"], [
         ["requests / successes", "13 / 12", "13 / 13", "13 / 12"], ["failures (frag.)", "1", "0", "1"],
         ["frees", "5", "5", "5"], ["scanned total / mean", "23 / 1.769", "29 / 2.231", "29 / 2.231"],
@@ -585,7 +597,7 @@ figcaption { font-size: 10pt; font-style: italic; text-align: center; margin-top
   line-height: 1.4; break-inside: avoid; text-align: left; }
 .alg .ah { border-bottom: 0.6pt solid #000; padding: 3px 0; margin-bottom: 3px; }
 .alg .ln { display: inline-block; width: 24px; font-size: 9.5pt; }
-pre.term { font-family: 'Liberation Mono', monospace; font-size: 8.8pt; line-height: 1.3; border: 0.8pt solid #000;
+pre.term { font-family: 'Liberation Mono', monospace; font-size: 9.6pt; line-height: 1.3; border: 0.8pt solid #000;
   padding: 6px 8px; margin: 6px 0 12px; white-space: pre-wrap; break-inside: avoid; text-align: left; }
 ol.refs { padding-left: 30px; font-size: 11pt; text-align: left; }
 ol.refs li::marker { content: "[" counter(list-item) "]  "; }

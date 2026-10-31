@@ -2,8 +2,8 @@
 @page { size: Letter; margin: 20mm 21mm 22mm 21mm; }
 * { box-sizing: border-box; }
 html, body { background: #fff; }
-body { margin: 0; font-family: 'Liberation Serif', 'Times New Roman', Times, serif; font-size: 11pt;
-  line-height: 1.38; color: #000; text-align: justify; }
+body { margin: 0; font-family: 'Liberation Serif', 'Times New Roman', Times, serif; font-size: 12pt;
+  line-height: 1.5; color: #000; text-align: justify; }
 .frame { position: fixed; top: -12mm; bottom: -12mm; left: -10mm; right: -10mm; border: 3px double #000;
   pointer-events: none; }
 .page { break-after: page; }
@@ -11,16 +11,17 @@ body { margin: 0; font-family: 'Liberation Serif', 'Times New Roman', Times, ser
   border-bottom: 3px double #000; break-after: avoid; }
 .ph { margin-top: 30px; text-align: center; }
 table.toc { width: 100%; border-collapse: collapse; font-size: 11.5pt; }
-.toc td, .toc th { border: 0.8pt solid #000; padding: 4px 8px; }
+.toc td, .toc th { border: 0.8pt solid #000; padding: 2px 8px; line-height: 1.3; }
 .toc td:nth-child(1), .toc td:nth-child(3), .toc th { text-align: center; }
-h2 { margin-top: 26px; }
+h2 { margin-top: 0; break-before: page; }
+h2#abs { break-before: auto; }
 h3 { font-size: 12pt; font-weight: bold; margin: 12px 0 4px; break-after: avoid; }
 p { margin: 0 0 8px; text-indent: 12mm; }
-p.abs { text-indent: 0; font-size: 11.5pt; }
+p.abs { text-indent: 12mm; }
 p.dropcap::first-letter { font-size: inherit; }
 code { font-family: 'Liberation Mono', monospace; font-size: 10pt; }
 ol.tight { margin: 0 0 8px; padding-left: 22px; }
-.fig { margin: 10px auto 14px; break-inside: avoid; text-align: center; width: 132mm; }
+.fig { margin: 10px auto 14px; break-inside: avoid; text-align: center; width: 150mm; }
 .fig svg { display: block; margin: 0 auto; }
 figcaption { font-size: 10pt; font-style: italic; text-align: center; margin-top: 4px; }
 .tbl { break-inside: avoid; margin: 10px auto 14px; width: 92%; }
@@ -43,8 +44,9 @@ ol.refs li::marker { content: "[" counter(list-item) "]  "; }
 <section class="page">
   <h1 class="ph">TABLE OF CONTENTS</h1>
   <table class="toc"><thead><tr><th>S.I NO.</th><th>SECTION TOPIC</th><th>PAGE NO.</th></tr></thead>
-  <tbody><tr><td>1</td><td><b>Introduction</b></td><td>5</td></tr><tr><td>2</td><td><b>Objectives, Scope and Limitations</b></td><td>5</td></tr><tr><td>3</td><td><b>Operating System Memory Management Concepts</b></td><td>6</td></tr><tr><td>4</td><td><b>System Architecture and Design</b></td><td>8</td></tr><tr><td>5</td><td><b>Module Description and Dependencies</b></td><td>11</td></tr><tr><td>6</td><td><b>Memory Model and Allocation State</b></td><td>12</td></tr><tr><td>7</td><td><b>First-Fit, Best-Fit and Worst-Fit Algorithms</b></td><td>13</td></tr><tr><td>8</td><td><b>Fragmentation and Compaction</b></td><td>14</td></tr><tr><td>9</td><td><b>Memory Allocation Examples and Results</b></td><td>15</td></tr><tr><td>10</td><td><b>Paging Model and Address Translation</b></td><td>16</td></tr><tr><td>11</td><td><b>FIFO, LRU and Optimal Replacement</b></td><td>18</td></tr><tr><td>12</td><td><b>Page Replacement Worked Examples</b></td><td>19</td></tr><tr><td>13</td><td><b>Paging Results and Comparison</b></td><td>20</td></tr><tr><td>14</td><td><b>Workloads and Performance Metrics</b></td><td>21</td></tr><tr><td>15</td><td><b>Benchmarking and Performance Analysis</b></td><td>22</td></tr><tr><td>16</td><td><b>Testing Strategy and Correctness</b></td><td>23</td></tr><tr><td>17</td><td><b>Test Cases and Test Results</b></td><td>24</td></tr><tr><td>18</td><td><b>User Interface and Workflow</b></td><td>24</td></tr><tr><td>19</td><td><b>Execution Examples and Output</b></td><td>25</td></tr><tr><td>20</td><td><b>Repository Structure and Development Conventions</b></td><td>26</td></tr><tr><td>21</td><td><b>Build System and Continuous Integration</b></td><td>27</td></tr><tr><td>22</td><td><b>Setup Instructions and Documentation</b></td><td>27</td></tr><tr><td>23</td><td><b>Conclusion and Future Scope</b></td><td>28</td></tr><tr><td>24</td><td><b>References</b></td><td>29</td></tr><tr><td>25</td><td><b>Appendix</b></td><td>29</td></tr></tbody></table>
-</section><div class="body"><p class="abs"><b>MemForge is a deterministic simulator of an operating-system
+  <tbody><tr><td>1</td><td><b>Introduction</b></td><td>6</td></tr><tr><td>2</td><td><b>Objectives, Scope and Limitations</b></td><td>7</td></tr><tr><td>3</td><td><b>Operating System Memory Management Concepts</b></td><td>8</td></tr><tr><td>4</td><td><b>System Architecture and Design</b></td><td>10</td></tr><tr><td>5</td><td><b>Module Description and Dependencies</b></td><td>13</td></tr><tr><td>6</td><td><b>Memory Model and Allocation State</b></td><td>15</td></tr><tr><td>7</td><td><b>First-Fit, Best-Fit and Worst-Fit Algorithms</b></td><td>17</td></tr><tr><td>8</td><td><b>Fragmentation and Compaction</b></td><td>18</td></tr><tr><td>9</td><td><b>Memory Allocation Examples and Results</b></td><td>20</td></tr><tr><td>10</td><td><b>Paging Model and Address Translation</b></td><td>22</td></tr><tr><td>11</td><td><b>FIFO, LRU and Optimal Replacement</b></td><td>24</td></tr><tr><td>12</td><td><b>Page Replacement Worked Examples</b></td><td>25</td></tr><tr><td>13</td><td><b>Paging Results and Comparison</b></td><td>27</td></tr><tr><td>14</td><td><b>Workloads and Performance Metrics</b></td><td>28</td></tr><tr><td>15</td><td><b>Benchmarking and Performance Analysis</b></td><td>29</td></tr><tr><td>16</td><td><b>Testing Strategy and Correctness</b></td><td>31</td></tr><tr><td>17</td><td><b>Test Cases and Test Results</b></td><td>32</td></tr><tr><td>18</td><td><b>User Interface and Workflow</b></td><td>33</td></tr><tr><td>19</td><td><b>Execution Examples and Output</b></td><td>34</td></tr><tr><td>20</td><td><b>Repository Structure and Development Conventions</b></td><td>35</td></tr><tr><td>21</td><td><b>Build System and Continuous Integration</b></td><td>36</td></tr><tr><td>22</td><td><b>Setup Instructions and Documentation</b></td><td>37</td></tr><tr><td>23</td><td><b>Conclusion and Future Scope</b></td><td>38</td></tr><tr><td>24</td><td><b>References</b></td><td>39</td></tr><tr><td>25</td><td><b>Appendix</b></td><td>40</td></tr></tbody></table>
+</section><div class="body"><h2 id="abs">ABSTRACT</h2>
+<p class="abs">MemForge is a deterministic simulator of an operating-system
 memory manager, written in C17 and also compiled to WebAssembly. It covers contiguous allocation
 (First-, Best- and Worst-Fit, splitting, coalescing, sliding compaction) and demand paging (single-level
 page tables, address translation, FIFO, LRU and OPT replacement). Policies only decide and engines only
@@ -54,9 +56,9 @@ success rate against 90.0&nbsp;&plusmn;&nbsp;0.6% for First-Fit and 87.2&nbsp;&p
 while First-Fit scans the fewest holes (3.21 vs. 5.24 per request). On 2,000-reference workloads,
 faults follow OPT &lt; LRU &lt; FIFO at every frame count (103.2, 138.9 and 253.1 at 8 frames), and a
 frame sweep reproduces Belady's anomaly (9 &rarr; 10 faults). All eight acceptance criteria and 17
-test suites pass under AddressSanitizer, UBSan and Valgrind.</b></p>
-<p class="abs"><b><i>Index Terms</i>&mdash;memory management, deterministic simulation, contiguous
-allocation, fragmentation, demand paging, page replacement, Belady's anomaly.</b></p><h2 id="s1">1. INTRODUCTION</h2><p class="dropcap">Every running program (a <i>process</i>) needs space in the computer's
+test suites pass under AddressSanitizer, UBSan and Valgrind.</p>
+<p class="abs"><b><i>Keywords</i>&mdash;</b>memory management, deterministic simulation, contiguous
+allocation, fragmentation, demand paging, page replacement, Belady's anomaly.</p><h2 id="s1">1. INTRODUCTION</h2><p class="dropcap">Every running program (a <i>process</i>) needs space in the computer's
 main memory (RAM) to hold its code and data. RAM is limited and shared by many processes, so the
 operating system must decide <i>who gets which part of memory</i>, give it back when a process finishes,
 and stop processes from touching each other's memory. This job is called <i>memory management</i>.</p>

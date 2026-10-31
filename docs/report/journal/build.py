@@ -88,7 +88,8 @@ def body():
     a = h.append
     a('<div class="body">')
     # ---------------------------------------------------------- abstract
-    a("""<p class="abs"><b>MemForge is a deterministic simulator of an operating-system
+    a("""<h2 id="abs">ABSTRACT</h2>
+<p class="abs">MemForge is a deterministic simulator of an operating-system
 memory manager, written in C17 and also compiled to WebAssembly. It covers contiguous allocation
 (First-, Best- and Worst-Fit, splitting, coalescing, sliding compaction) and demand paging (single-level
 page tables, address translation, FIFO, LRU and OPT replacement). Policies only decide and engines only
@@ -98,9 +99,9 @@ success rate against 90.0&nbsp;&plusmn;&nbsp;0.6% for First-Fit and 87.2&nbsp;&p
 while First-Fit scans the fewest holes (3.21 vs. 5.24 per request). On 2,000-reference workloads,
 faults follow OPT &lt; LRU &lt; FIFO at every frame count (103.2, 138.9 and 253.1 at 8 frames), and a
 frame sweep reproduces Belady's anomaly (9 &rarr; 10 faults). All eight acceptance criteria and 17
-test suites pass under AddressSanitizer, UBSan and Valgrind.</b></p>
-<p class="abs"><b><i>Index Terms</i>&mdash;memory management, deterministic simulation, contiguous
-allocation, fragmentation, demand paging, page replacement, Belady's anomaly.</b></p>""")
+test suites pass under AddressSanitizer, UBSan and Valgrind.</p>
+<p class="abs"><b><i>Keywords</i>&mdash;</b>memory management, deterministic simulation, contiguous
+allocation, fragmentation, demand paging, page replacement, Belady's anomaly.</p>""")
 
     # ---------------------------------------------------------- 1
     a(sec("Introduction"))
@@ -550,8 +551,8 @@ CSS = """
 @page { size: Letter; margin: 20mm 21mm 22mm 21mm; }
 * { box-sizing: border-box; }
 html, body { background: #fff; }
-body { margin: 0; font-family: 'Liberation Serif', 'Times New Roman', Times, serif; font-size: 11pt;
-  line-height: 1.38; color: #000; text-align: justify; }
+body { margin: 0; font-family: 'Liberation Serif', 'Times New Roman', Times, serif; font-size: 12pt;
+  line-height: 1.5; color: #000; text-align: justify; }
 .frame { position: fixed; top: -12mm; bottom: -12mm; left: -10mm; right: -10mm; border: 3px double #000;
   pointer-events: none; }
 .page { break-after: page; }
@@ -559,16 +560,17 @@ body { margin: 0; font-family: 'Liberation Serif', 'Times New Roman', Times, ser
   border-bottom: 3px double #000; break-after: avoid; }
 .ph { margin-top: 30px; text-align: center; }
 table.toc { width: 100%; border-collapse: collapse; font-size: 11.5pt; }
-.toc td, .toc th { border: 0.8pt solid #000; padding: 4px 8px; }
+.toc td, .toc th { border: 0.8pt solid #000; padding: 2px 8px; line-height: 1.3; }
 .toc td:nth-child(1), .toc td:nth-child(3), .toc th { text-align: center; }
-h2 { margin-top: 26px; }
+h2 { margin-top: 0; break-before: page; }
+h2#abs { break-before: auto; }
 h3 { font-size: 12pt; font-weight: bold; margin: 12px 0 4px; break-after: avoid; }
 p { margin: 0 0 8px; text-indent: 12mm; }
-p.abs { text-indent: 0; font-size: 11.5pt; }
+p.abs { text-indent: 12mm; }
 p.dropcap::first-letter { font-size: inherit; }
 code { font-family: 'Liberation Mono', monospace; font-size: 10pt; }
 ol.tight { margin: 0 0 8px; padding-left: 22px; }
-.fig { margin: 10px auto 14px; break-inside: avoid; text-align: center; width: 132mm; }
+.fig { margin: 10px auto 14px; break-inside: avoid; text-align: center; width: 150mm; }
 .fig svg { display: block; margin: 0 auto; }
 figcaption { font-size: 10pt; font-style: italic; text-align: center; margin-top: 4px; }
 .tbl { break-inside: avoid; margin: 10px auto 14px; width: 92%; }

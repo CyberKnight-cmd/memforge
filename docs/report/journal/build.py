@@ -39,15 +39,20 @@ def tab(cap, head, rows, cls=""):
             f'<span>{cap}</span></div><table><thead><tr>{th}</tr></thead><tbody>{tr}</tbody></table></div>')
 
 
+_subn = [0]
+
+
 def sec(title):
     _sec[0] += 1
-    r = ROMAN[_sec[0] - 1]
-    TOC.append((title, f"{r}. {title.upper()}"))
-    return f'<h2 id="s{_sec[0]}">{r}. {title}</h2>'
+    _subn[0] = 0
+    n = _sec[0]
+    TOC.append((title, f"{n}. {title.upper()}"))
+    return f'<h2 id="s{n}">{n}. {title.upper()}</h2>'
 
 
 def sub(letter, t):
-    return f"<h3>{letter}. {t}</h3>"
+    _subn[0] += 1
+    return f"<h3>{_sec[0]}.{_subn[0]} {t}</h3>"
 
 
 def alg(title, lines):
@@ -63,58 +68,14 @@ def term(lines):
 
 # =================================================================== FRONT
 def front(toc_pages):
-    names = "".join(f"<div>{n} ({r})</div>" for n, r, _ in TEAM)
-    cover = f"""
-<section class="page cover">
-  <div class="ctitle">{TITLE}</div>
-  <p class="cnote">An OS Mini Project submitted for the partial fulfillment of<br>the requirements for the degree</p>
-  <p>of</p><p class="deg">BACHELOR OF TECHNOLOGY</p><p>in</p>
-  <p class="deg2">COMPUTER SCIENCE &amp; ENGINEERING</p><p>By</p>
-  <div class="names">{names}</div>
-  <p class="teamno">TEAM NO. 5</p>
-  <div class="inst">Department of Computer Science and Engineering<br>Institute of Engineering and Management<br>
-  (School of University of Engineering and Management, Kolkata)<br>Newtown Sector<br>2026</div>
-</section>"""
-    rows = "".join(f"<tr><td>{i+1}</td><td>{n}</td><td>{c}</td><td></td></tr>" for i, (n, _, c) in enumerate(TEAM))
-    decl = f"""
-<section class="page plain">
-  <h1 class="ph">DECLARATION</h1>
-  <p>We hereby declare that this project is the product of our own independent work and has not been
-  submitted, in whole or in part, to any other university or institution for the award of any degree,
-  diploma, or other qualification. All sources of information have been duly acknowledged, and any work
-  carried out in collaboration with others has been clearly indicated in the text.</p>
-  <p>Signed by the B.Tech Students: -</p>
-  <table class="sig"><thead><tr><th>Sl. No.</th><th>Name</th><th>Class Roll No.</th><th>Signature</th></tr></thead>
-  <tbody>{rows}</tbody></table>
-  <p style="margin-top:28px">Date: -</p>
-</section>"""
-    ack = """
-<section class="page plain">
-  <h1 class="ph">ACKNOWLEDGEMENT</h1>
-  <p class="ind">We would like to take this opportunity to express our heartfelt gratitude to everyone who
-  inspired, supported, and contributed &mdash; directly or indirectly &mdash; to the successful completion of
-  this OS mini project.</p>
-  <p class="ind">First and foremost, we extend our deepest thanks to our families for their unwavering support
-  and encouragement throughout our academic journey. We are equally grateful to our project guide,
-  [Guide Name], for his/her unwavering support, guidance, and encouragement throughout this project.
-  His/her knowledge and guidance have been invaluable in shaping our work and in preparing this report.
-  We would also like to express our sincere thanks to the faculty members and fellow students of the
-  Department of Computer Science and Engineering, University of Engineering and Management, Kolkata, for
-  their helpful suggestions and support, and for allowing us to call this institution home.</p>
-  <p class="ind">Finally, we bow in gratitude to the Almighty for the strength, clarity, and perseverance to
-  endure and overcome the challenges along this journey. This project has been a rewarding learning
-  experience, and we feel deeply blessed to have had the support and grace needed to complete it.</p>
-  <p style="margin-top:40px">Team No. 5<br>University of Engineering and Management, Kolkata</p>
-</section>"""
-    trs = "".join(f"<tr><td>{i+1}</td><td>{t}</td><td>{toc_pages.get(i, '')}</td></tr>"
+    trs = "".join(f"<tr><td>{i+1}</td><td><b>{t}</b></td><td>{toc_pages.get(i, '')}</td></tr>"
                   for i, (t, _) in enumerate(TOC_ENTRIES))
-    toc = f"""
-<section class="page plain">
+    return f"""
+<section class="page">
   <h1 class="ph">TABLE OF CONTENTS</h1>
-  <table class="toc"><thead><tr><th>S. No.</th><th>Section Topic</th><th>Page No.</th></tr></thead>
+  <table class="toc"><thead><tr><th>S.I NO.</th><th>SECTION TOPIC</th><th>PAGE NO.</th></tr></thead>
   <tbody>{trs}</tbody></table>
 </section>"""
-    return cover + decl + ack + toc
 
 
 TOC_ENTRIES = []  # filled after body generation: (title, search key)
@@ -125,7 +86,7 @@ def body():
     authors = ", ".join(n for n, _, _ in TEAM)
     h = []
     a = h.append
-    a('<div class="cols">')
+    a('<div class="body">')
     # ---------------------------------------------------------- abstract
     a("""<p class="abs"><b>MemForge is a deterministic simulator of an operating-system
 memory manager, written in C17 and also compiled to WebAssembly. It covers contiguous allocation
@@ -253,6 +214,12 @@ exactly. Workloads refer to blocks by stable allocation ids, never by address, b
 blocks; each id passes through the lifecycle in Fig.&nbsp;12, which rules out duplicate ids and
 double frees.</p>""")
     a(fig(F.fig_block_model(), "Block array, block record and allocation-id lifecycle."))
+    a(alg("Block splitting", ["check the hole is free and size &ge; s",
+        "<b>if</b> size &gt; s <b>then</b> insert a free block [start + s, end) after it",
+        "set size &larr; s, pid, alloc_id, requested; mark ALLOCATED", "<b>return</b> block index"]))
+    a(alg("Block freeing and coalescing", ["verify the block is ALLOCATED",
+        "mark FREE; clear pid and alloc_id", "<b>if</b> right neighbour is free <b>then</b> merge it",
+        "<b>if</b> left neighbour is free <b>then</b> merge into it"]))
     a(fig(F.fig_split_coalesce(), "Splitting a hole on allocation and coalescing on free."))
     a(tab("Model operations", ["Operation", "Time", "Space"], [
         ["split", "O(1), O(N) worst (shift)", "O(1)"], ["free + coalesce", "O(1), O(N) worst", "O(1)"]]))
@@ -334,6 +301,11 @@ the paging engine (Fig.&nbsp;19).</p>""")
 offset = va &amp; (S&minus;1) and pa = (f &lt;&lt; k) | offset (Fig.&nbsp;20). The full access path,
 including hit, fault, eviction and write-back, is Fig.&nbsp;9. Faults are <i>compulsory</i> on a page's
 first use and <i>capacity</i> afterwards. A hit costs O(1), a fault O(F); space is O(P + F).</p>""")
+    a(alg("Paging address translation", ["validate pid and vpn; <b>if</b> invalid <b>then</b> AccessViolation, <b>return</b>",
+        "refs &larr; refs + 1", "<b>if</b> page present <b>then</b> PageHit",
+        "<b>else</b> PageFault; take lowest free frame <b>or</b> policy victim",
+        "&nbsp;&nbsp;<b>if</b> victim dirty <b>then</b> PageWrittenBack; evict; load page; update frame owner",
+        "set R; <b>if</b> write <b>then</b> set D", "<b>return</b> pa = (frame &lt;&lt; k) | offset"]))
     a(fig(F.fig_translate_example(), "Translating va = 6700 with page size 4096."))
     a(fig(F.fig_page_life(), "Page life cycle; dirty victims are written back."))
     a(tab("Paging invariants (checked after every step)", ["ID", "Invariant"], [
@@ -535,7 +507,9 @@ local replacement; Knuth's fifty-percent rule; real program traces; fuzzing and 
 
     # ---------------------------------------------------------- refs
     TOC_ENTRIES.extend([(t, k) for t, k in TOC])
-    a('<h2 class="unnum" id="refs">References</h2>')
+    TOC_ENTRIES.append(("References", "24. REFERENCES"))
+    TOC_ENTRIES.append(("Appendix", "25. APPENDIX"))
+    a('<h2 id="refs">24. REFERENCES</h2>')
     refs = [
         "A. Silberschatz, P. B. Galvin and G. Gagne, <i>Operating System Concepts</i>, 10th ed. Hoboken, NJ, USA: Wiley, 2018.",
         "A. S. Tanenbaum and H. Bos, <i>Modern Operating Systems</i>, 4th ed. Boston, MA, USA: Pearson, 2015.",
@@ -550,11 +524,9 @@ local replacement; Knuth's fifty-percent rule; real program traces; fuzzing and 
         "Kitware, <i>CMake Reference Documentation</i>. [Online]. Available: https://cmake.org/documentation/",
         "<i>Svelte Documentation</i>, https://svelte.dev/docs; <i>Valgrind User Manual</i>, https://valgrind.org/docs/manual/."]
     a('<ol class="refs">' + "".join(f"<li>{r}</li>" for r in refs) + "</ol>")
-    TOC_ENTRIES.append(("References", "References"))
 
     # ---------------------------------------------------------- appendix
-    a('<h2 class="unnum" id="app">Appendix</h2>')
-    TOC_ENTRIES.append(("Appendix", "Appendix"))
+    a('<h2 id="app">25. APPENDIX</h2>')
     a(tab("Complete AC-1 comparison metrics", ["Metric", "FF", "BF", "WF"], [
         ["requests / successes", "13 / 12", "13 / 13", "13 / 12"], ["failures (frag.)", "1", "0", "1"],
         ["frees", "5", "5", "5"], ["scanned total / mean", "23 / 1.769", "29 / 2.231", "29 / 2.231"],
@@ -575,61 +547,46 @@ local replacement; Knuth's fifty-percent rule; real program traces; fuzzing and 
 
 
 CSS = """
-@page { size: A4; margin: 17mm 15mm 18mm 15mm; }
+@page { size: Letter; margin: 20mm 21mm 22mm 21mm; }
 * { box-sizing: border-box; }
-body { margin: 0; font-family: 'Liberation Serif', 'Times New Roman', Times, serif; font-size: 10pt;
-  line-height: 1.24; color: #000; background: #fff; }
-.page { page-break-after: always; break-after: page; min-height: 255mm; }
-.cover { text-align: center; padding-top: 6mm; font-size: 13pt; }
-.cover p { margin: 4px 0; }
-.ctitle { font-size: 21pt; font-weight: bold; margin: 0 8mm 14mm; line-height: 1.25; }
-.deg, .deg2 { font-weight: bold; font-size: 15pt; }
-.names { margin: 10px 0 6px; line-height: 1.55; font-size: 12.5pt; }
-.teamno { font-weight: bold; }
-.inst { margin-top: 18mm; font-weight: bold; line-height: 1.5; }
-.plain { font-size: 12pt; line-height: 1.6; text-align: justify; padding: 4mm 6mm; }
-.ph { text-align: center; font-size: 16pt; margin: 4mm 0 10mm; }
-.ind { text-indent: 12mm; }
-table.sig, table.toc { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11.5pt; }
-.sig td, .sig th, .toc td, .toc th { border: 0.6pt solid #000; padding: 4px 8px; }
-.sig td:nth-child(1), .sig td:nth-child(3), .toc td:nth-child(1), .toc td:nth-child(3) { text-align: center; }
-.toc td, .toc th { padding: 3.4px 8px; }
-.ieee-head { text-align: center; margin-bottom: 10px; }
-.ttl { font-size: 21pt; line-height: 1.15; margin: 2px 6mm 8px; }
-.auth { font-size: 10.5pt; margin: 0 4mm 4px; }
-.aff { font-size: 8.6pt; font-style: italic; margin-bottom: 4px; }
-.cols { column-count: 2; column-gap: 6mm; column-fill: auto; text-align: justify; hyphens: auto; }
-p { margin: 0 0 5px; text-indent: 1em; }
-p.abs { text-indent: 0; font-size: 8.8pt; line-height: 1.2; }
-p.dropcap::first-letter { float: left; font-size: 25pt; line-height: 0.9; padding: 1px 2px 0 0; }
-p.dropcap { text-indent: 0; }
-h2 { font-size: 9.6pt; font-weight: normal; font-variant: small-caps; text-align: center; margin: 10px 0 5px;
-  letter-spacing: 0.3px; break-after: avoid; }
-h3 { font-size: 9.6pt; font-weight: normal; font-style: italic; margin: 6px 0 3px; break-after: avoid; }
-code { font-family: 'Liberation Mono', monospace; font-size: 8pt; }
-ol.tight { margin: 0 0 5px; padding-left: 16px; } ol.tight li { margin: 0 0 1px; }
-.fig { margin: 8px auto 10px; break-inside: avoid; text-align: center; column-span: all; width: 132mm; }
-.fig .art { width: 100%; }
+html, body { background: #fff; }
+body { margin: 0; font-family: 'Liberation Serif', 'Times New Roman', Times, serif; font-size: 11pt;
+  line-height: 1.38; color: #000; text-align: justify; }
+.frame { position: fixed; top: -12mm; bottom: -12mm; left: -10mm; right: -10mm; border: 3px double #000;
+  pointer-events: none; }
+.page { break-after: page; }
+.ph, h2 { text-align: right; font-size: 14pt; font-weight: bold; margin: 18px 0 14px; padding-bottom: 6px;
+  border-bottom: 3px double #000; break-after: avoid; }
+.ph { margin-top: 30px; text-align: center; }
+table.toc { width: 100%; border-collapse: collapse; font-size: 11.5pt; }
+.toc td, .toc th { border: 0.8pt solid #000; padding: 4px 8px; }
+.toc td:nth-child(1), .toc td:nth-child(3), .toc th { text-align: center; }
+h2 { margin-top: 26px; }
+h3 { font-size: 12pt; font-weight: bold; margin: 12px 0 4px; break-after: avoid; }
+p { margin: 0 0 8px; text-indent: 12mm; }
+p.abs { text-indent: 0; font-size: 11.5pt; }
+p.dropcap::first-letter { font-size: inherit; }
+code { font-family: 'Liberation Mono', monospace; font-size: 10pt; }
+ol.tight { margin: 0 0 8px; padding-left: 22px; }
+.fig { margin: 10px auto 14px; break-inside: avoid; text-align: center; width: 132mm; }
 .fig svg { display: block; margin: 0 auto; }
-figcaption { font-size: 8pt; text-align: center; margin-top: 3px; text-indent: 0; }
-.tbl { break-inside: avoid; margin: 6px 0 8px; }
-.tcap { text-align: center; font-size: 8pt; margin-bottom: 3px; letter-spacing: 0.4px; }
-.tcap span { font-variant: small-caps; letter-spacing: 0; }
-.tbl table { width: 100%; border-collapse: collapse; font-size: 7.8pt; line-height: 1.18; text-align: left; }
-.tbl.small table { font-size: 7.2pt; }
-.tbl th { border-top: 0.9pt solid #000; border-bottom: 0.5pt solid #000; padding: 2px 3px; font-weight: bold; }
-.tbl td { padding: 1.5px 3px; vertical-align: top; }
-.tbl tbody tr:last-child td { border-bottom: 0.9pt solid #000; }
-.alg { border-top: 0.9pt solid #000; border-bottom: 0.9pt solid #000; margin: 6px 0 8px; font-size: 8.2pt;
-  break-inside: avoid; text-align: left; }
-.alg .ah { border-bottom: 0.5pt solid #000; padding: 2px 0; margin-bottom: 2px; }
-.alg .ln { display: inline-block; width: 16px; font-size: 7.2pt; }
-pre.term { font-family: 'Liberation Mono', monospace; font-size: 6.5pt; line-height: 1.25; border: 0.6pt solid #000;
-  padding: 4px 5px; margin: 4px 0 7px; white-space: pre-wrap; break-inside: avoid; text-align: left; }
-ol.refs { padding-left: 18px; font-size: 7.8pt; margin: 0; text-align: left; }
-ol.refs li { margin-bottom: 2px; }
+figcaption { font-size: 10pt; font-style: italic; text-align: center; margin-top: 4px; }
+.tbl { break-inside: avoid; margin: 10px auto 14px; width: 92%; }
+.tcap { text-align: center; font-size: 10pt; font-weight: bold; margin-bottom: 4px; }
+.tcap span { font-weight: normal; font-style: italic; }
+.tbl table { width: 100%; border-collapse: collapse; font-size: 10pt; line-height: 1.3; text-align: left; }
+.tbl.small table { font-size: 9.5pt; }
+.tbl th { border-top: 1.2pt solid #000; border-bottom: 0.6pt solid #000; padding: 3px 6px; }
+.tbl td { padding: 2px 6px; vertical-align: top; }
+.tbl tbody tr:last-child td { border-bottom: 1.2pt solid #000; }
+.alg { border-top: 1.2pt solid #000; border-bottom: 1.2pt solid #000; margin: 10px 0 14px; font-size: 10.5pt;
+  line-height: 1.4; break-inside: avoid; text-align: left; }
+.alg .ah { border-bottom: 0.6pt solid #000; padding: 3px 0; margin-bottom: 3px; }
+.alg .ln { display: inline-block; width: 24px; font-size: 9.5pt; }
+pre.term { font-family: 'Liberation Mono', monospace; font-size: 8.8pt; line-height: 1.3; border: 0.8pt solid #000;
+  padding: 6px 8px; margin: 6px 0 12px; white-space: pre-wrap; break-inside: avoid; text-align: left; }
+ol.refs { padding-left: 30px; font-size: 11pt; text-align: left; }
 ol.refs li::marker { content: "[" counter(list-item) "]  "; }
-h2.unnum { font-variant: small-caps; }
 """
 
 
@@ -640,10 +597,10 @@ const {{ chromium }} = require('playwright');
   const b = await chromium.launch();
   const p = await b.newPage();
   await p.goto('file://{html_path}');
-  await p.pdf({{ path: '{pdf_path}', format: 'A4', printBackground: true, displayHeaderFooter: true,
+  await p.pdf({{ path: '{pdf_path}', format: 'Letter', printBackground: true, displayHeaderFooter: false,
     headerTemplate: '<span></span>',
     footerTemplate: '<div style="width:100%;text-align:center;font-family:Liberation Serif,serif;font-size:9px"><span class="pageNumber"></span></div>',
-    margin: {{ top: '17mm', bottom: '18mm', left: '15mm', right: '15mm' }} }});
+    preferCSSPageSize: true }});
   await b.close();
 }})();"""
     (HERE / "_render.js").write_text(js)
@@ -656,15 +613,12 @@ def page_of(pdf, keys):
                             text=True).stdout for i in range(1, n + 1)]
     out = {}
     for idx, (title, key) in enumerate(TOC_ENTRIES):
-        if key in ("References", "Appendix"):
-            pat = re.compile(r"^\s*" + key + r"\s*$", re.M | re.I)
-        else:
-            pat = re.compile(r"(^|\s)" + re.escape(key) + r"\b")
+        pat = re.compile(r"^\s*" + re.escape(key) + r"\s*$", re.M)
         for i, t in enumerate(texts):
-            if i < 4:
+            if i < 1:
                 continue
             if pat.search(t):
-                out[idx] = i + 1
+                out[idx] = i + 1 + 3
                 break
     return out, n
 
@@ -673,8 +627,7 @@ def main():
     b = body()
     # headings render in small caps; pdftotext gives the source case, so search the source title
     global TOC_ENTRIES
-    TOC_ENTRIES = [(t, k if t in ("Abstract", "References", "Appendix") else k.split(". ", 1)[0] + ". " + t)
-                   for t, k in TOC_ENTRIES]
+
     html_path = HERE / "memforge-ieee.html"
     pdf_path = HERE / "memforge-ieee.pdf"
     pages = {}
@@ -684,7 +637,34 @@ def main():
         html_path.write_text(html)
         render(html_path, pdf_path)
         pages, n = page_of(str(pdf_path), None)
-    print("pages:", n, "toc:", pages)
+    finish(pdf_path)
+    print("pages:", n + 3, "toc:", pages)
+
+
+def finish(pdf_path):
+    """Prepend the college's first three pages verbatim and stamp page numbers from 4."""
+    from pypdf import PdfReader, PdfWriter
+    from reportlab.pdfgen import canvas
+    import io
+    body = PdfReader(str(pdf_path))
+    w = PdfWriter()
+    for p in PdfReader(str(HERE / "first3.pdf")).pages:
+        w.add_page(p)
+    for k, p in enumerate(body.pages):
+        buf = io.BytesIO()
+        W, H = float(p.mediabox.width), float(p.mediabox.height)
+        c = canvas.Canvas(buf, pagesize=(W, H))
+        c.setLineWidth(1)
+        c.rect(36, 36, W - 72, H - 72)
+        c.rect(39.5, 39.5, W - 79, H - 79)
+        c.setFont("Times-Roman", 10)
+        c.drawCentredString(W / 2, 46, str(k + 4))
+        c.save()
+        buf.seek(0)
+        p.merge_page(PdfReader(buf).pages[0])
+        w.add_page(p)
+    with open(HERE / "MemForge-Report.pdf", "wb") as f:
+        w.write(f)
 
 
 if __name__ == "__main__":

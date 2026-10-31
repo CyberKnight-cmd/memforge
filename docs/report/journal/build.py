@@ -125,13 +125,9 @@ def body():
     authors = ", ".join(n for n, _, _ in TEAM)
     h = []
     a = h.append
-    a(f"""<div class="ieee-head"><div class="ttl">{TITLE}</div>
-<div class="auth">{authors}</div>
-<div class="aff">Department of Computer Science and Engineering, Institute of Engineering and Management,
-University of Engineering and Management, Kolkata, India &middot; Team No. 5</div></div>""")
     a('<div class="cols">')
     # ---------------------------------------------------------- abstract
-    a("""<p class="abs"><b><i>Abstract</i>&mdash;MemForge is a deterministic simulator of an operating-system
+    a("""<p class="abs"><b>MemForge is a deterministic simulator of an operating-system
 memory manager, written in C17 and also compiled to WebAssembly. It covers contiguous allocation
 (First-, Best- and Worst-Fit, splitting, coalescing, sliding compaction) and demand paging (single-level
 page tables, address translation, FIFO, LRU and OPT replacement). Policies only decide and engines only
@@ -147,7 +143,11 @@ allocation, fragmentation, demand paging, page replacement, Belady's anomaly.</b
 
     # ---------------------------------------------------------- 1
     a(sec("Introduction"))
-    a("""<p class="dropcap">Memory management decides where each process lives in physical memory and how
+    a("""<p class="dropcap">Every running program (a <i>process</i>) needs space in the computer's
+main memory (RAM) to hold its code and data. RAM is limited and shared by many processes, so the
+operating system must decide <i>who gets which part of memory</i>, give it back when a process finishes,
+and stop processes from touching each other's memory. This job is called <i>memory management</i>.</p>
+<p>Memory management decides where each process lives in physical memory and how
 its addresses are translated. Textbooks present contiguous allocation and demand paging with small
 hand-worked examples, but the trade-offs between policies only become visible when they run on the same
 workload, step by step, at scale.</p>
@@ -179,14 +179,22 @@ policies are out; compaction is never automatic.</p>""")
 
     # ---------------------------------------------------------- 3
     a(sec("Operating System Memory Management Concepts"))
-    a("""<p>The MMU maps each <i>logical</i> address produced by the CPU to a <i>physical</i> address and traps
+    a("""<p><b>From the ground up.</b> Think of memory as one long row of numbered boxes (addresses 0, 1,
+2,&nbsp;&hellip;). A program asks for, say, 212 boxes; the OS must find 212 <i>free boxes in a row</i>, mark
+them as used, and later mark them free again. Two broad strategies exist: give each request one
+unbroken run of boxes (<i>contiguous allocation</i>), or cut both programs and memory into equal-sized
+pieces that can be placed anywhere (<i>paging</i>). MemForge simulates both.</p>
+<p>The MMU maps each <i>logical</i> address produced by the CPU to a <i>physical</i> address and traps
 invalid accesses. Under contiguous allocation each request receives one run of memory taken from a free
 <i>hole</i>: First-Fit takes the first hole that fits, Best-Fit the smallest and Worst-Fit the largest.
 <i>External</i> fragmentation is free memory split into holes too small to use; <i>internal</i>
 fragmentation is unused space inside a block (zero in MemForge, since granted = requested).
 Compaction slides blocks together to merge the holes (Fig.&nbsp;3).</p>""")
     a(fig(F.fig_concepts(), "Address translation, external fragmentation and compaction."))
-    a("""<p>Paging splits logical memory into fixed-size <i>pages</i> and physical memory into equal
+    a("""<p><b>Why paging?</b> With contiguous allocation, free space ends up scattered in small gaps.
+Paging avoids this: every piece is the same size, so any free slot fits any piece. The cost is a
+lookup table per program that records where each piece currently lives.</p>
+<p>Paging splits logical memory into fixed-size <i>pages</i> and physical memory into equal
 <i>frames</i>; a page table maps one to the other (Fig.&nbsp;4). Under demand paging a page is loaded only
 on its first use; a reference to a non-resident page is a <i>page fault</i>. When no frame is free, a
 replacement policy picks a victim: FIFO the oldest page, LRU the least recently used, OPT the page used
@@ -237,7 +245,10 @@ registry line.</p>""")
 
     # ---------------------------------------------------------- 6
     a(sec("Memory Model and Allocation State"))
-    a("""<p>Memory [0,&nbsp;M) is an address-ordered array of <code>ms_block</code> records that tile it
+    a("""<p>In plain terms, MemForge keeps a list of memory pieces in address order; each piece is either
+<i>used</i> (owned by a process) or <i>free</i> (a hole). Allocation cuts a hole in two; freeing joins a
+piece with free neighbours so holes never sit side by side.</p>
+<p>Memory [0,&nbsp;M) is an address-ordered array of <code>ms_block</code> records that tile it
 exactly. Workloads refer to blocks by stable allocation ids, never by address, because compaction moves
 blocks; each id passes through the lifecycle in Fig.&nbsp;12, which rules out duplicate ids and
 double frees.</p>""")
@@ -248,7 +259,10 @@ double frees.</p>""")
 
     # ---------------------------------------------------------- 7
     a(sec("First-Fit, Best-Fit and Worst-Fit Algorithms"))
-    a("""<p>A placement policy is a pure selector: given the holes in address order and a size
+    a("""<p>When several holes are big enough, which one should be used? Picture parking a car: take the
+<i>first</i> space that fits (First-Fit), the <i>tightest</i> space that fits (Best-Fit), or the
+<i>biggest</i> space (Worst-Fit). Each choice affects how usable the leftover gaps will be later.</p>
+<p>A placement policy is a pure selector: given the holes in address order and a size
 <i>s</i>, it returns whether a hole was found, which one, and how many holes it <i>scanned</i> (the
 search-cost metric). Algorithm&nbsp;1 gives all three; they differ only in the selection test.</p>""")
     a(alg("Placement selection (FF / BF / WF)", [
@@ -270,6 +284,10 @@ gain), size-indexed trees (O(log h) but harder to keep deterministic) and the bu
 
     # ---------------------------------------------------------- 8
     a(sec("Fragmentation and Compaction"))
+    a("""<p><b>The problem.</b> After many allocations and frees, free memory is broken into small gaps.
+A new request may fail even though the <i>total</i> free memory is enough, simply because no single gap
+is big enough. MemForge measures how bad this is, and can fix it by <i>compaction</i>: sliding all used
+pieces to one end so the gaps merge into one big hole, at the cost of copying data.</p>""")
     a(tab("Fragmentation metrics", ["Metric", "Definition"], [
         ["total_free, largest_hole, hole_count", "sum of holes; largest; number of holes"],
         ["ext_frag", "1 &minus; largest_hole / total_free (0 if none free), in ppm"],
@@ -305,7 +323,11 @@ cheapest to run. All policies degrade as utilisation rises.</p>""")
 
     # ---------------------------------------------------------- 10
     a(sec("Paging Model and Address Translation"))
-    a("""<p>The paging subsystem has four parts: MMU, per-process page tables, an inverted frame table and
+    a("""<p>Each program sees its own private <i>virtual</i> addresses starting at 0. Its memory is cut into
+pages (here 4096 bytes); RAM is cut into frames of the same size. A per-program <i>page table</i> says
+which frame holds each page. To read an address, the hardware splits it into "which page" and "how far
+into the page", looks up the frame, and keeps the offset unchanged.</p>
+<p>The paging subsystem has four parts: MMU, per-process page tables, an inverted frame table and
 the paging engine (Fig.&nbsp;19).</p>""")
     a(fig(F.fig_pte(), "Page-table entry and inverted frame table."))
     a("""<p>For a power-of-two page size <i>S</i>, k = log<sub>2</sub>S; vpn = va &gt;&gt; k,
@@ -324,7 +346,11 @@ first use and <i>capacity</i> afterwards. A hit costs O(1), a fault O(F); space 
 
     # ---------------------------------------------------------- 11
     a(sec("FIFO, LRU and Optimal Replacement"))
-    a("""<p>A replacement policy keeps only its own bookkeeping and answers one question: which frame to
+    a("""<p>When a needed page is not in RAM and every frame is already full, some page must be thrown out
+to make room. A good choice throws out a page that will not be needed soon; a bad choice throws out a
+page that is needed again immediately, causing another fault. FIFO, LRU and OPT are three rules for
+making this choice.</p>
+<p>A replacement policy keeps only its own bookkeeping and answers one question: which frame to
 evict. The engine calls its hooks in a fixed order (Fig.&nbsp;22); ties go to the lowest frame.</p>""")
     a(fig(F.fig_hooks(), "Order of replacement-policy hooks on a hit and on a fault."))
     a(tab("Replacement policies compared", ["Policy", "State", "Per fault", "Future?", "Stack?"], [
@@ -370,6 +396,10 @@ locality but costly, which is why real systems approximate it with Clock.</p>"""
 
     # ---------------------------------------------------------- 14
     a(sec("Workloads and Performance Metrics"))
+    a("""<p>A <i>workload</i> is simply a script of memory requests (allocate, free, access a page) that is
+fed to the simulator. A <i>metric</i> is a number measured while it runs, such as how many requests
+succeeded or how many page faults occurred. Using the same workload for every policy makes the
+comparison fair.</p>""")
     a(fig(F.fig_workload(), "Workload file format and loader pipeline."))
     a(fig(F.fig_metrics(), "One collector derives every metric from the event stream."))
 
@@ -396,6 +426,9 @@ regenerates from the generator, the seed and the git revision.</p>""")
 
     # ---------------------------------------------------------- 16
     a(sec("Testing Strategy and Correctness"))
+    a("""<p>Testing answers one question: does the simulator give the right answers? We check it against
+textbook examples whose answers are known, check internal consistency rules after every single step,
+run it twice to confirm identical output, and run memory-error detectors over the C code.</p>""")
     a(fig(F.fig_test_layers(), "Independent test layers; a bug missed by one is caught by another."))
     a(fig(F.fig_checked(), "Checked mode: invariants after every operation."))
     a("""<p>Randomised oracles: 5,000 compactions match a unit-by-unit oracle; no policy beats OPT; LRU and

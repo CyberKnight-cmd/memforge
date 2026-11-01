@@ -95,7 +95,7 @@ jobs:
         run: bash scripts/build_wasm.sh
       - name: Build the native CLI (the web tests compare its traces with the WebAssembly build)
         run: cmake --preset release && cmake --build --preset release
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
